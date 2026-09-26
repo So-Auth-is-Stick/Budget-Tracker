@@ -6,8 +6,7 @@ import TransactionRow from './TransactionRow';
 import TransactionDetailModal from './TransactionDetailModal';
 import { todayStr, getWeekRange } from './dateUtils';
 
-export default function CalendarScreen({ categories }) {
-  const [transactions, setTransactions] = useState([]);
+export default function CalendarScreen({ categories, transactions, setTransactions }) {
   const [selectedDate, setSelectedDate] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
 
