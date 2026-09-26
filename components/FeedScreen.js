@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal } from 'react-native';
 import { loadTransactions, addTransaction, deleteTransaction } from './storage';
+import { Modal as RNModal } from 'react-native';
+import CategoryManager from './CategoryManager';
+import { loadCategories, findCategory } from './categories';
 
 export default function FeedScreen() {
   const [transactions, setTransactions] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [amount, setAmount] = useState('');
   const [type, setType] = useState('expense');
+  const [categories, setCategories] = useState([]);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
   useEffect(() => {
     loadTransactions().then(setTransactions);
@@ -18,16 +24,18 @@ export default function FeedScreen() {
 
   const handleSave = async () => {
     const value = parseFloat(amount);
-    if (!value || value <= 0) return;
+    if (!value || value <= 0 || !selectedCategoryId) return;
     const newTx = {
       id: Date.now(),
       type,
       amount: value,
+      category: selectedCategoryId,
       date: new Date().toISOString().slice(0, 10),
     };
     const updated = await addTransaction(newTx);
     setTransactions(updated);
     setAmount('');
+    setSelectedCategoryId(null);
     setModalVisible(false);
   };
 
@@ -38,6 +46,12 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerHello}>Today</Text>
+        <TouchableOpacity onPress={() => setCategoryModalVisible(true)}>
+          <Text style={{ fontSize: 18 }}>🏷️</Text>
+        </TouchableOpacity>
+      </View>
       <Text style={styles.label}>Balance</Text>
       <Text style={styles.balance}>₱{balance.toFixed(2)}</Text>
 
@@ -46,17 +60,21 @@ export default function FeedScreen() {
         keyExtractor={(item) => String(item.id)}
         style={{ width: '100%' }}
         contentContainerStyle={{ paddingBottom: 160 }}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={{ color: item.type === 'income' ? '#7FC29B' : '#D97A55' }}>
-              {item.type === 'income' ? '+' : '−'}₱{item.amount.toFixed(2)}
-            </Text>
-            <Text style={styles.date}>{item.date}</Text>
-            <TouchableOpacity onPress={() => handleDelete(item.id)}>
-              <Text style={{ color: '#5E6F68' }}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const cat = findCategory(categories, item.category);
+          return (
+            <View style={styles.row}>
+              <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
+              <Text style={{ color: '#F4EFE6', flex: 1, marginLeft: 8 }}>{cat.label}</Text>
+              <Text style={{ color: item.type === 'income' ? '#7FC29B' : '#D97A55' }}>
+                {item.type === 'income' ? '+' : '−'}₱{item.amount.toFixed(2)}
+              </Text>
+              <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                <Text style={{ color: '#5E6F68', marginLeft: 8 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }}
         ListEmptyComponent={<Text style={styles.empty}>No transactions yet.</Text>}
       />
 
@@ -70,17 +88,33 @@ export default function FeedScreen() {
             <View style={styles.typeRow}>
               <TouchableOpacity
                 style={[styles.typeBtn, type === 'expense' && styles.typeBtnActive]}
-                onPress={() => setType('expense')}
+                onPress={() => { setType('expense'); setSelectedCategoryId(null); }}
               >
                 <Text style={{ color: '#F4EFE6' }}>Spent</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.typeBtn, type === 'income' && styles.typeBtnActive]}
-                onPress={() => setType('income')}
+                onPress={() => { setType('income'); setSelectedCategoryId(null); }}
               >
                 <Text style={{ color: '#F4EFE6' }}>Earned</Text>
               </TouchableOpacity>
             </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              {categories.filter((c) => c.type === type).map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  onPress={() => setSelectedCategoryId(c.id)}
+                  style={[
+                    styles.chip,
+                    selectedCategoryId === c.id && { backgroundColor: c.color, borderColor: c.color },
+                  ]}
+                >
+                  <Text style={{ color: selectedCategoryId === c.id ? '#1B1200' : '#F4EFE6' }}>
+                    {c.icon} {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
             <TextInput
               style={styles.input}
               keyboardType="decimal-pad"
@@ -98,11 +132,30 @@ export default function FeedScreen() {
           </View>
         </View>
       </Modal>
+      <RNModal visible={categoryModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.sheet}>
+            <CategoryManager onChange={setCategories} />
+            <TouchableOpacity onPress={() => setCategoryModalVisible(false)} style={{ marginTop: 14 }}>
+              <Text style={{ color: '#9FB0A8', textAlign: 'center' }}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </RNModal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  chip: {
+    paddingVertical: 8, paddingHorizontal: 13, borderRadius: 20,
+    borderWidth: 1, borderColor: '#2A3B34', backgroundColor: '#1D2E27', marginRight: 8,
+  },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    width: '100%', paddingHorizontal: 20, marginBottom: 8,
+  },
+  headerHello: { color: '#9FB0A8', fontSize: 14 },
   container: { flex: 1, backgroundColor: '#0F1A18', alignItems: 'center', paddingTop: 60 },
   label: { color: '#9FB0A8', fontSize: 13 },
   balance: { color: '#F4EFE6', fontSize: 40, marginBottom: 20 },
