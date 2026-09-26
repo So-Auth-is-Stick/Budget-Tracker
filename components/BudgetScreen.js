@@ -1,38 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { updateCategory } from './categories';
-import { loadGoals, addGoal, updateGoal, deleteGoal } from './goals';
+import { addGoal, updateGoal, deleteGoal } from './goals';
 import { todayStr, monthOf } from './dateUtils';
 
-export default function BudgetScreen({ categories, setCategories, transactions }) {
-  const [goals, setGoals] = useState([]);
+export default function BudgetScreen({ categories, setCategories, transactions, goals, setGoals }) {
   const [limitModalCat, setLimitModalCat] = useState(null);
   const [dailyInput, setDailyInput] = useState('');
   const [monthlyInput, setMonthlyInput] = useState('');
-
   const [addGoalVisible, setAddGoalVisible] = useState(false);
   const [newGoalLabel, setNewGoalLabel] = useState('');
   const [newGoalTarget, setNewGoalTarget] = useState('');
   const [newGoalNote, setNewGoalNote] = useState('');
-
   const [fundsModalGoal, setFundsModalGoal] = useState(null);
   const [fundsInput, setFundsInput] = useState('');
-
-  useEffect(() => { loadGoals().then(setGoals); }, []);
 
   const today = todayStr();
   const currentMonth = monthOf(today);
   const expenseCats = categories.filter((c) => c.type === 'expense');
 
   const spentOn = (categoryId, dateStr) =>
-    transactions
-      .filter((t) => t.type === 'expense' && t.category === categoryId && t.date === dateStr)
-      .reduce((sum, t) => sum + t.amount, 0);
-
+    transactions.filter((t) => t.type === 'expense' && t.category === categoryId && t.date === dateStr).reduce((sum, t) => sum + t.amount, 0);
   const spentThisMonth = (categoryId) =>
-    transactions
-      .filter((t) => t.type === 'expense' && t.category === categoryId && monthOf(t.date) === currentMonth)
-      .reduce((sum, t) => sum + t.amount, 0);
+    transactions.filter((t) => t.type === 'expense' && t.category === categoryId && monthOf(t.date) === currentMonth).reduce((sum, t) => sum + t.amount, 0);
 
   const openLimitModal = (cat) => {
     setLimitModalCat(cat);
@@ -42,38 +32,23 @@ export default function BudgetScreen({ categories, setCategories, transactions }
   const saveLimits = async () => {
     const daily = parseFloat(dailyInput);
     const monthly = parseFloat(monthlyInput);
-    const updated = await updateCategory(limitModalCat.id, {
-      dailyBudget: daily > 0 ? daily : 0,
-      budget: monthly > 0 ? monthly : 0,
-    });
-    setCategories(updated);
+    setCategories(await updateCategory(limitModalCat.id, { dailyBudget: daily > 0 ? daily : 0, budget: monthly > 0 ? monthly : 0 }));
     setLimitModalCat(null);
   };
-
-  const openAddGoal = () => {
-    setNewGoalLabel(''); setNewGoalTarget(''); setNewGoalNote('');
-    setAddGoalVisible(true);
-  };
+  const openAddGoal = () => { setNewGoalLabel(''); setNewGoalTarget(''); setNewGoalNote(''); setAddGoalVisible(true); };
   const saveNewGoal = async () => {
     const target = parseFloat(newGoalTarget);
     if (!newGoalLabel.trim() || !target || target <= 0) return;
-    const updated = await addGoal({
-      id: 'goal_' + Date.now(), label: newGoalLabel.trim(),
-      targetAmount: target, savedAmount: 0, note: newGoalNote.trim(),
-    });
-    setGoals(updated);
+    setGoals(await addGoal({ id: 'goal_' + Date.now(), label: newGoalLabel.trim(), targetAmount: target, savedAmount: 0, note: newGoalNote.trim() }));
     setAddGoalVisible(false);
   };
-
   const openAddFunds = (goal) => { setFundsModalGoal(goal); setFundsInput(''); };
   const saveFunds = async () => {
     const value = parseFloat(fundsInput);
     if (!value || value <= 0) return;
-    const updated = await updateGoal(fundsModalGoal.id, { savedAmount: fundsModalGoal.savedAmount + value });
-    setGoals(updated);
+    setGoals(await updateGoal(fundsModalGoal.id, { savedAmount: fundsModalGoal.savedAmount + value }));
     setFundsModalGoal(null);
   };
-
   const confirmDeleteGoal = (goal) => {
     Alert.alert('Delete this goal?', goal.label, [
       { text: 'Cancel', style: 'cancel' },
@@ -96,45 +71,36 @@ export default function BudgetScreen({ categories, setCategories, transactions }
           const dayOver = dailyBudget > 0 && daySpent > dailyBudget;
           const monthOver = monthlyBudget > 0 && monthSpent > monthlyBudget;
           const hasAnyLimit = dailyBudget > 0 || monthlyBudget > 0;
-
           return (
             <TouchableOpacity key={cat.id} style={styles.budgetRow} onPress={() => openLimitModal(cat)}>
               <Text style={styles.budgetName}>{cat.icon} {cat.label}</Text>
               {!hasAnyLimit && <Text style={styles.noLimit}>No limits set — tap to add one</Text>}
-
               {dailyBudget > 0 && (
                 <View style={styles.limitBlock}>
                   <View style={styles.limitTop}>
                     <Text style={styles.limitLabel}>Daily</Text>
                     <Text style={[styles.limitAmt, dayOver && { color: '#D97A55' }]}>
-                      ₱{daySpent.toFixed(0)} / ₱{dailyBudget.toFixed(0)}
+                      {dayOver ? '⚠️ ' : ''}₱{daySpent.toFixed(0)} / ₱{dailyBudget.toFixed(0)}
                     </Text>
                   </View>
-                  <View style={styles.track}>
-                    <View style={[styles.fill, { width: `${dayPct}%`, backgroundColor: dayOver ? '#D97A55' : cat.color }]} />
-                  </View>
+                  <View style={styles.track}><View style={[styles.fill, { width: `${dayPct}%`, backgroundColor: dayOver ? '#D97A55' : cat.color }]} /></View>
                 </View>
               )}
-
               {monthlyBudget > 0 && (
                 <View style={styles.limitBlock}>
                   <View style={styles.limitTop}>
                     <Text style={styles.limitLabel}>Monthly</Text>
                     <Text style={[styles.limitAmt, monthOver && { color: '#D97A55' }]}>
-                      ₱{monthSpent.toFixed(0)} / ₱{monthlyBudget.toFixed(0)}
+                      {monthOver ? '⚠️ ' : ''}₱{monthSpent.toFixed(0)} / ₱{monthlyBudget.toFixed(0)}
                     </Text>
                   </View>
-                  <View style={styles.track}>
-                    <View style={[styles.fill, { width: `${monthPct}%`, backgroundColor: monthOver ? '#D97A55' : cat.color }]} />
-                  </View>
+                  <View style={styles.track}><View style={[styles.fill, { width: `${monthPct}%`, backgroundColor: monthOver ? '#D97A55' : cat.color }]} /></View>
                 </View>
               )}
             </TouchableOpacity>
           );
         })}
-
         <View style={styles.divider} />
-
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Savings & upcoming payments</Text>
           <TouchableOpacity onPress={openAddGoal}><Text style={styles.addLink}>+ Add</Text></TouchableOpacity>
@@ -149,16 +115,13 @@ export default function BudgetScreen({ categories, setCategories, transactions }
                 <Text style={styles.limitAmt}>₱{g.savedAmount.toFixed(0)} / ₱{g.targetAmount.toFixed(0)}</Text>
               </View>
               {!!g.note && <Text style={styles.goalNote}>{g.note}</Text>}
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${pct}%`, backgroundColor: '#E8B84B' }]} />
-              </View>
+              <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: '#E8B84B' }]} /></View>
             </TouchableOpacity>
           );
         })}
         <Text style={styles.hint}>Tap a goal to add funds. Long-press to delete.</Text>
       </ScrollView>
 
-      {/* Set limits modal */}
       <Modal visible={!!limitModalCat} animationType="slide" transparent>
         <View style={styles.overlay}>
           <View style={styles.sheet}>
@@ -172,8 +135,6 @@ export default function BudgetScreen({ categories, setCategories, transactions }
           </View>
         </View>
       </Modal>
-
-      {/* Add goal modal */}
       <Modal visible={addGoalVisible} animationType="slide" transparent>
         <View style={styles.overlay}>
           <View style={styles.sheet}>
@@ -186,8 +147,6 @@ export default function BudgetScreen({ categories, setCategories, transactions }
           </View>
         </View>
       </Modal>
-
-      {/* Add funds modal */}
       <Modal visible={!!fundsModalGoal} animationType="slide" transparent>
         <View style={styles.overlay}>
           <View style={styles.sheet}>

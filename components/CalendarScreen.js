@@ -1,192 +1,115 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
-import { updateCategory } from './categories';
-import { addGoal, updateGoal, deleteGoal } from './goals';
-import { todayStr, monthOf } from './dateUtils';
+import { View, Text, FlatList, TextInput, StyleSheet } from 'react-native';
+import { Calendar } from 'react-native-calendars';
+import { deleteTransaction, updateTransaction } from './storage';
+import TransactionRow from './TransactionRow';
+import TransactionDetailModal from './TransactionDetailModal';
+import { findCategory } from './categories';
+import { todayStr, getWeekRange } from './dateUtils';
 
-export default function BudgetScreen({ categories, setCategories, transactions, goals, setGoals }) {
-  const [limitModalCat, setLimitModalCat] = useState(null);
-  const [dailyInput, setDailyInput] = useState('');
-  const [monthlyInput, setMonthlyInput] = useState('');
-  const [addGoalVisible, setAddGoalVisible] = useState(false);
-  const [newGoalLabel, setNewGoalLabel] = useState('');
-  const [newGoalTarget, setNewGoalTarget] = useState('');
-  const [newGoalNote, setNewGoalNote] = useState('');
-  const [fundsModalGoal, setFundsModalGoal] = useState(null);
-  const [fundsInput, setFundsInput] = useState('');
+export default function CalendarScreen({ categories, transactions, setTransactions }) {
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [detailItem, setDetailItem] = useState(null);
+  const [searchText, setSearchText] = useState('');
 
-  const today = todayStr();
-  const currentMonth = monthOf(today);
-  const expenseCats = categories.filter((c) => c.type === 'expense');
+  const refDate = selectedDate || todayStr();
+  const { start, end } = getWeekRange(refDate);
+  const weeklySpend = transactions.filter((t) => t.type === 'expense' && t.date >= start && t.date <= end).reduce((sum, t) => sum + t.amount, 0);
+  const dailySpend = selectedDate
+    ? transactions.filter((t) => t.type === 'expense' && t.date === selectedDate).reduce((sum, t) => sum + t.amount, 0)
+    : 0;
 
-  const spentOn = (categoryId, dateStr) =>
-    transactions.filter((t) => t.type === 'expense' && t.category === categoryId && t.date === dateStr).reduce((sum, t) => sum + t.amount, 0);
-  const spentThisMonth = (categoryId) =>
-    transactions.filter((t) => t.type === 'expense' && t.category === categoryId && monthOf(t.date) === currentMonth).reduce((sum, t) => sum + t.amount, 0);
+  const summaryByDate = transactions.reduce((acc, t) => {
+    if (!acc[t.date]) acc[t.date] = { income: false, expense: false };
+    acc[t.date][t.type] = true;
+    return acc;
+  }, {});
 
-  const openLimitModal = (cat) => {
-    setLimitModalCat(cat);
-    setDailyInput(cat.dailyBudget ? String(cat.dailyBudget) : '');
-    setMonthlyInput(cat.budget ? String(cat.budget) : '');
-  };
-  const saveLimits = async () => {
-    const daily = parseFloat(dailyInput);
-    const monthly = parseFloat(monthlyInput);
-    setCategories(await updateCategory(limitModalCat.id, { dailyBudget: daily > 0 ? daily : 0, budget: monthly > 0 ? monthly : 0 }));
-    setLimitModalCat(null);
-  };
-  const openAddGoal = () => { setNewGoalLabel(''); setNewGoalTarget(''); setNewGoalNote(''); setAddGoalVisible(true); };
-  const saveNewGoal = async () => {
-    const target = parseFloat(newGoalTarget);
-    if (!newGoalLabel.trim() || !target || target <= 0) return;
-    setGoals(await addGoal({ id: 'goal_' + Date.now(), label: newGoalLabel.trim(), targetAmount: target, savedAmount: 0, note: newGoalNote.trim() }));
-    setAddGoalVisible(false);
-  };
-  const openAddFunds = (goal) => { setFundsModalGoal(goal); setFundsInput(''); };
-  const saveFunds = async () => {
-    const value = parseFloat(fundsInput);
-    if (!value || value <= 0) return;
-    setGoals(await updateGoal(fundsModalGoal.id, { savedAmount: fundsModalGoal.savedAmount + value }));
-    setFundsModalGoal(null);
-  };
-  const confirmDeleteGoal = (goal) => {
-    Alert.alert('Delete this goal?', goal.label, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => setGoals(await deleteGoal(goal.id)) },
-    ]);
-  };
+  const overLimitDates = {};
+  const dailyLimited = categories.filter((c) => c.type === 'expense' && c.dailyBudget > 0);
+  if (dailyLimited.length) {
+    const byDateCat = {};
+    transactions.forEach((t) => {
+      if (t.type !== 'expense') return;
+      const key = t.date + '|' + t.category;
+      byDateCat[key] = (byDateCat[key] || 0) + t.amount;
+    });
+    dailyLimited.forEach((c) => {
+      Object.keys(byDateCat).forEach((key) => {
+        const [date, catId] = key.split('|');
+        if (catId === c.id && byDateCat[key] > c.dailyBudget) overLimitDates[date] = true;
+      });
+    });
+  }
+
+  const markedDates = Object.keys(summaryByDate).reduce((acc, date) => {
+    const dots = [];
+    if (summaryByDate[date].income) dots.push({ key: 'in', color: '#7FC29B' });
+    if (summaryByDate[date].expense) dots.push({ key: 'out', color: '#D97A55' });
+    if (overLimitDates[date]) dots.push({ key: 'warn', color: '#E8B84B' });
+    acc[date] = { dots, marked: true };
+    return acc;
+  }, {});
+  if (selectedDate) {
+    markedDates[selectedDate] = { ...(markedDates[selectedDate] || {}), selected: true, selectedColor: '#E8B84B' };
+  }
+
+  const dayTransactions = selectedDate
+    ? [...transactions.filter((t) => t.date === selectedDate)].reverse()
+    : [];
+  const filteredDayTransactions = dayTransactions.filter((t) => {
+    const cat = findCategory(categories, t.category);
+    const q = searchText.trim().toLowerCase();
+    return !q || (t.note || '').toLowerCase().includes(q) || cat.label.toLowerCase().includes(q);
+  });
+
+  const handleDelete = async (id) => setTransactions(await deleteTransaction(id));
+  const handleEditSave = async (id, changes) => setTransactions(await updateTransaction(id, changes));
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 160 }}>
-        <Text style={styles.sectionTitle}>Spending limits</Text>
-        {expenseCats.length === 0 && <Text style={styles.empty}>No spending tags yet.</Text>}
-        {expenseCats.map((cat) => {
-          const daySpent = spentOn(cat.id, today);
-          const monthSpent = spentThisMonth(cat.id);
-          const dailyBudget = cat.dailyBudget || 0;
-          const monthlyBudget = cat.budget || 0;
-          const dayPct = dailyBudget > 0 ? Math.min(100, (daySpent / dailyBudget) * 100) : 0;
-          const monthPct = monthlyBudget > 0 ? Math.min(100, (monthSpent / monthlyBudget) * 100) : 0;
-          const dayOver = dailyBudget > 0 && daySpent > dailyBudget;
-          const monthOver = monthlyBudget > 0 && monthSpent > monthlyBudget;
-          const hasAnyLimit = dailyBudget > 0 || monthlyBudget > 0;
-          return (
-            <TouchableOpacity key={cat.id} style={styles.budgetRow} onPress={() => openLimitModal(cat)}>
-              <Text style={styles.budgetName}>{cat.icon} {cat.label}</Text>
-              {!hasAnyLimit && <Text style={styles.noLimit}>No limits set — tap to add one</Text>}
-              {dailyBudget > 0 && (
-                <View style={styles.limitBlock}>
-                  <View style={styles.limitTop}>
-                    <Text style={styles.limitLabel}>Daily</Text>
-                    <Text style={[styles.limitAmt, dayOver && { color: '#D97A55' }]}>
-                      {dayOver ? '⚠️ ' : ''}₱{daySpent.toFixed(0)} / ₱{dailyBudget.toFixed(0)}
-                    </Text>
-                  </View>
-                  <View style={styles.track}><View style={[styles.fill, { width: `${dayPct}%`, backgroundColor: dayOver ? '#D97A55' : cat.color }]} /></View>
-                </View>
-              )}
-              {monthlyBudget > 0 && (
-                <View style={styles.limitBlock}>
-                  <View style={styles.limitTop}>
-                    <Text style={styles.limitLabel}>Monthly</Text>
-                    <Text style={[styles.limitAmt, monthOver && { color: '#D97A55' }]}>
-                      {monthOver ? '⚠️ ' : ''}₱{monthSpent.toFixed(0)} / ₱{monthlyBudget.toFixed(0)}
-                    </Text>
-                  </View>
-                  <View style={styles.track}><View style={[styles.fill, { width: `${monthPct}%`, backgroundColor: monthOver ? '#D97A55' : cat.color }]} /></View>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-        <View style={styles.divider} />
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Savings & upcoming payments</Text>
-          <TouchableOpacity onPress={openAddGoal}><Text style={styles.addLink}>+ Add</Text></TouchableOpacity>
-        </View>
-        {goals.length === 0 && <Text style={styles.empty}>Nothing set aside yet.</Text>}
-        {goals.map((g) => {
-          const pct = Math.min(100, (g.savedAmount / g.targetAmount) * 100);
-          return (
-            <TouchableOpacity key={g.id} style={styles.budgetRow} onLongPress={() => confirmDeleteGoal(g)} onPress={() => openAddFunds(g)}>
-              <View style={styles.budgetTop}>
-                <Text style={styles.budgetName}>{g.label}</Text>
-                <Text style={styles.limitAmt}>₱{g.savedAmount.toFixed(0)} / ₱{g.targetAmount.toFixed(0)}</Text>
-              </View>
-              {!!g.note && <Text style={styles.goalNote}>{g.note}</Text>}
-              <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: '#E8B84B' }]} /></View>
-            </TouchableOpacity>
-          );
-        })}
-        <Text style={styles.hint}>Tap a goal to add funds. Long-press to delete.</Text>
-      </ScrollView>
-
-      <Modal visible={!!limitModalCat} animationType="slide" transparent>
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{limitModalCat?.icon} {limitModalCat?.label} limits</Text>
-            <Text style={styles.fieldLabel}>Daily limit</Text>
-            <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="e.g. 300" placeholderTextColor="#5E6F68" value={dailyInput} onChangeText={setDailyInput} />
-            <Text style={styles.fieldLabel}>Monthly limit</Text>
-            <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="e.g. 5000" placeholderTextColor="#5E6F68" value={monthlyInput} onChangeText={setMonthlyInput} />
-            <TouchableOpacity style={styles.saveBtn} onPress={saveLimits}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => setLimitModalCat(null)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+      <Calendar
+        markingType="multi-dot"
+        markedDates={markedDates}
+        onDayPress={(day) => setSelectedDate(day.dateString)}
+        theme={{ calendarBackground: '#0F1A18', dayTextColor: '#F4EFE6', monthTextColor: '#F4EFE6', textDisabledColor: '#5E6F68', todayTextColor: '#E8B84B', arrowColor: '#E8B84B' }}
+        style={{ marginBottom: 10 }}
+      />
+      <View style={styles.weekStat}>
+        <Text style={styles.weekStatLabel}>This week ({start.slice(5)} – {end.slice(5)})</Text>
+        <Text style={styles.weekStatValue}>₱{weeklySpend.toFixed(2)}</Text>
+      </View>
+      {selectedDate && (
+        <View style={{ flex: 1 }}>
+          <View style={styles.dayHeader}>
+            <Text style={styles.dayLabel}>{selectedDate}</Text>
+            <Text style={styles.dayTotal}>{overLimitDates[selectedDate] ? '⚠️ ' : ''}Spent ₱{dailySpend.toFixed(2)}</Text>
           </View>
+          {dayTransactions.length > 4 && (
+            <TextInput style={styles.searchInput} placeholder="Search this day's entries" placeholderTextColor="#5E6F68" value={searchText} onChangeText={setSearchText} />
+          )}
+          <FlatList
+            data={filteredDayTransactions}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            renderItem={({ item }) => <TransactionRow item={item} categories={categories} onPress={setDetailItem} />}
+            ListEmptyComponent={<Text style={styles.empty}>Nothing logged this day.</Text>}
+          />
         </View>
-      </Modal>
-      <Modal visible={addGoalVisible} animationType="slide" transparent>
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>New savings goal</Text>
-            <TextInput style={styles.textField} placeholder="Name (e.g. Emergency fund, New phone)" placeholderTextColor="#5E6F68" value={newGoalLabel} onChangeText={setNewGoalLabel} />
-            <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="Target amount" placeholderTextColor="#5E6F68" value={newGoalTarget} onChangeText={setNewGoalTarget} />
-            <TextInput style={styles.textField} placeholder="Note (optional, e.g. 'due December')" placeholderTextColor="#5E6F68" value={newGoalNote} onChangeText={setNewGoalNote} />
-            <TouchableOpacity style={styles.saveBtn} onPress={saveNewGoal}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => setAddGoalVisible(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      <Modal visible={!!fundsModalGoal} animationType="slide" transparent>
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Add funds — {fundsModalGoal?.label}</Text>
-            <TextInput style={styles.input} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#5E6F68" value={fundsInput} onChangeText={setFundsInput} autoFocus />
-            <TouchableOpacity style={styles.saveBtn} onPress={saveFunds}><Text style={styles.saveBtnText}>Add</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => setFundsModalGoal(null)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      )}
+      <TransactionDetailModal visible={!!detailItem} item={detailItem} categories={categories} onClose={() => setDetailItem(null)} onDelete={handleDelete} onSave={handleEditSave} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F1A18', paddingTop: 60 },
-  sectionTitle: { color: '#9FB0A8', fontSize: 13, paddingHorizontal: 20, marginBottom: 10 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20 },
-  addLink: { color: '#E8B84B', fontSize: 13, fontWeight: '600', marginBottom: 10 },
-  empty: { color: '#5E6F68', fontSize: 13, paddingHorizontal: 20, marginBottom: 10 },
-  divider: { height: 1, backgroundColor: '#2A3B34', marginVertical: 22, marginHorizontal: 20 },
-  budgetRow: { paddingHorizontal: 20, paddingVertical: 12 },
-  budgetTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  budgetName: { color: '#F4EFE6', fontSize: 14.5, marginBottom: 8 },
-  noLimit: { color: '#5E6F68', fontSize: 12, marginBottom: 4 },
-  limitBlock: { marginBottom: 8 },
-  limitTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  limitLabel: { color: '#5E6F68', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.5 },
-  limitAmt: { color: '#9FB0A8', fontSize: 13 },
-  goalNote: { color: '#5E6F68', fontSize: 12, marginBottom: 6 },
-  track: { height: 7, backgroundColor: '#1D2E27', borderRadius: 4, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 4 },
-  hint: { color: '#5E6F68', fontSize: 11.5, paddingHorizontal: 20, marginTop: 10 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#16241F', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22 },
-  sheetTitle: { color: '#F4EFE6', fontSize: 16, marginBottom: 16 },
-  fieldLabel: { color: '#5E6F68', fontSize: 12, marginBottom: 4 },
-  input: { fontSize: 28, color: '#F4EFE6', textAlign: 'center', marginBottom: 18, borderBottomColor: '#2A3B34', borderBottomWidth: 1, paddingBottom: 8 },
-  textField: { backgroundColor: '#1D2E27', borderRadius: 12, color: '#F4EFE6', padding: 12, fontSize: 14.5, marginBottom: 14 },
-  saveBtn: { backgroundColor: '#E8B84B', padding: 14, borderRadius: 14, alignItems: 'center' },
-  saveBtnText: { color: '#1B1200', fontWeight: '600' },
-  cancel: { color: '#9FB0A8', textAlign: 'center', marginTop: 12 },
+  weekStat: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 14 },
+  weekStatLabel: { color: '#9FB0A8', fontSize: 13 },
+  weekStatValue: { color: '#D97A55', fontSize: 15, fontWeight: '600' },
+  dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 10 },
+  dayLabel: { color: '#9FB0A8', fontSize: 13 },
+  dayTotal: { color: '#D97A55', fontSize: 12.5, fontWeight: '600' },
+  searchInput: { backgroundColor: '#1D2E27', borderRadius: 12, color: '#F4EFE6', padding: 10, fontSize: 13.5, marginHorizontal: 20, marginBottom: 10 },
+  empty: { color: '#5E6F68', textAlign: 'center', marginTop: 20 },
 });
