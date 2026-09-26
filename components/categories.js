@@ -46,3 +46,8 @@ export async function deleteCategory(id) {
 export function findCategory(categories, id) {
   return categories.find((c) => c.id === id) || { label: id, icon: '◦', color: '#8A8A8A' };
 }
+
+export const COLOR_PALETTE = [
+  '#D97A55', '#C9954A', '#B85C7A', '#9C6ADE', '#5E9AD9',
+  '#4FB0A5', '#7FC29B', '#5FB88C', '#8FCB77', '#E8B84B', '#8A8A8A',
+];
