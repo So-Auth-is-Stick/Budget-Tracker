@@ -1,4 +1,4 @@
-import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { findCategory } from './categories';
 
 export default function TransactionDetailModal({ visible, item, categories, onClose, onDelete }) {
@@ -6,6 +6,21 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
   const cat = findCategory(categories, item.category);
   const sign = item.type === 'income' ? '+' : '−';
   const amountColor = item.type === 'income' ? '#7FC29B' : '#D97A55';
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Delete this entry?',
+      `${cat.icon} ${cat.label} — ${sign}₱${item.amount.toFixed(2)}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => { onDelete(item.id); onClose(); },
+        },
+      ]
+    );
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -16,7 +31,7 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
           <Text style={styles.date}>{item.date}</Text>
           <Text style={styles.noteLabel}>Description</Text>
           <Text style={styles.note}>{item.note ? item.note : 'No description added.'}</Text>
-          <TouchableOpacity style={styles.deleteBtn} onPress={() => { onDelete(item.id); onClose(); }}>
+          <TouchableOpacity style={styles.deleteBtn} onPress={confirmDelete}>
             <Text style={{ color: '#D97A55', fontWeight: '600' }}>Delete this entry</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={onClose} style={{ marginTop: 14 }}>
