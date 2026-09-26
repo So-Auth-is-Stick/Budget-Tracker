@@ -1,11 +1,17 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import PinScreen from './components/PinScreen';
 
 export default function App() {
+  const [unlocked, setUnlocked] = useState(false);
+
+  if (!unlocked) {
+    return <PinScreen onUnlock={() => setUnlocked(true)} />;
+  }
+
   return (
     <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
+      <Text style={{ color: '#F4EFE6' }}>You're in! (Feed screen comes next)</Text>
     </View>
   );
 }
@@ -13,7 +19,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#0F1A18',
     alignItems: 'center',
     justifyContent: 'center',
   },
