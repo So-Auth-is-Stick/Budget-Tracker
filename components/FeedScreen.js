@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal, ScrollView } from 'react-native';
-import { loadTransactions, addTransaction, deleteTransaction } from './storage';
+import { addTransaction, deleteTransaction } from './storage';
 import CategoryManager from './CategoryManager';
 import TransactionRow from './TransactionRow';
 import TransactionDetailModal from './TransactionDetailModal';
 import { todayStr } from './dateUtils';
 
-export default function FeedScreen({ categories, setCategories }) {
-  const [transactions, setTransactions] = useState([]);
+export default function FeedScreen({ categories, setCategories, transactions, setTransactions }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
@@ -16,16 +15,15 @@ export default function FeedScreen({ categories, setCategories }) {
   const [type, setType] = useState('expense');
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
-  useEffect(() => { loadTransactions().then(setTransactions); }, []);
   const balance = transactions.reduce((sum, t) => t.type === 'income' ? sum + t.amount : sum - t.amount, 0);
   const todaySpend = transactions
-  .filter((t) => t.type === 'expense' && t.date === todayStr())
-  .reduce((sum, t) => sum + t.amount, 0);
-  
+    .filter((t) => t.type === 'expense' && t.date === todayStr())
+    .reduce((sum, t) => sum + t.amount, 0);
+
   const handleSave = async () => {
     const value = parseFloat(amount);
     if (!value || value <= 0 || !selectedCategoryId) return;
-    const newTx = { id: Date.now(), type, amount: value, category: selectedCategoryId, note: note.trim(), date: new Date().toISOString().slice(0, 10) };
+    const newTx = { id: Date.now(), type, amount: value, category: selectedCategoryId, note: note.trim(), date: todayStr() };
     setTransactions(await addTransaction(newTx));
     setAmount(''); setNote(''); setSelectedCategoryId(null); setModalVisible(false);
   };
@@ -35,22 +33,23 @@ export default function FeedScreen({ categories, setCategories }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerHello}>Today</Text>
         <TouchableOpacity onPress={() => setCategoryModalVisible(true)}><Text style={{ fontSize: 18 }}>🏷️</Text></TouchableOpacity>
       </View>
       <Text style={styles.label}>Balance</Text>
       <Text style={styles.balance}>₱{balance.toFixed(2)}</Text>
+
       <View style={styles.statRow}>
         <Text style={styles.statLabel}>Spent today</Text>
         <Text style={styles.statValue}>₱{todaySpend.toFixed(2)}</Text>
       </View>
+
       <FlatList
         data={[...transactions].reverse()}
         keyExtractor={(item) => String(item.id)}
         style={{ width: '100%' }}
         contentContainerStyle={{ paddingBottom: 160 }}
         renderItem={({ item }) => (
-          <TransactionRow item={item} categories={categories} onPress={setDetailItem} onDelete={handleDelete} />
+          <TransactionRow item={item} categories={categories} onPress={setDetailItem} />
         )}
         ListEmptyComponent={<Text style={styles.empty}>No transactions yet.</Text>}
       />
@@ -103,17 +102,13 @@ export default function FeedScreen({ categories, setCategories }) {
 }
 
 const styles = StyleSheet.create({
-  statRow: {
-    flexDirection: 'row', justifyContent: 'space-between', width: '100%',
-    paddingHorizontal: 20, marginBottom: 18,
-  },
+  container: { flex: 1, backgroundColor: '#0F1A18', alignItems: 'center', paddingTop: 60 },
+  header: { flexDirection: 'row', justifyContent: 'flex-end', width: '100%', paddingHorizontal: 20, marginBottom: 8 },
+  label: { color: '#9FB0A8', fontSize: 13 },
+  balance: { color: '#F4EFE6', fontSize: 40, marginBottom: 14 },
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, marginBottom: 18 },
   statLabel: { color: '#9FB0A8', fontSize: 13.5 },
   statValue: { color: '#D97A55', fontSize: 15, fontWeight: '600' },
-  container: { flex: 1, backgroundColor: '#0F1A18', alignItems: 'center', paddingTop: 60 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 20, marginBottom: 8 },
-  headerHello: { color: '#9FB0A8', fontSize: 14 },
-  label: { color: '#9FB0A8', fontSize: 13 },
-  balance: { color: '#F4EFE6', fontSize: 40, marginBottom: 20 },
   empty: { color: '#5E6F68', textAlign: 'center', marginTop: 30 },
   fab: { position: 'absolute', bottom: 100, backgroundColor: '#E8B84B', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 16 },
   fabText: { color: '#1B1200', fontWeight: '600' },

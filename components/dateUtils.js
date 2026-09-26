@@ -12,3 +12,6 @@ export function getWeekRange(dateStr) {
   const toStr = (x) => x.toISOString().slice(0, 10);
   return { start: toStr(start), end: toStr(end) };
 }
+export function monthOf(dateStr) {
+  return dateStr.slice(0, 7); // "2026-09"
+}
