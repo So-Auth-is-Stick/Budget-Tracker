@@ -1,44 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
-import {
-  loadCategories, addCategory, updateCategory, deleteCategory, COLOR_PALETTE,
-} from './categories';
+import { addCategory, updateCategory, deleteCategory, COLOR_PALETTE } from './categories';
 
-export default function CategoryManager({ onChange }) {
-  const [categories, setCategories] = useState([]);
+export default function CategoryManager({ categories, setCategories }) {
   const [manageType, setManageType] = useState('expense');
   const [newLabel, setNewLabel] = useState('');
   const [newIcon, setNewIcon] = useState('');
   const [newColor, setNewColor] = useState(COLOR_PALETTE[0]);
 
-  useEffect(() => {
-    loadCategories().then(setCategories);
-  }, []);
-
-  const refresh = (list) => {
-    setCategories(list);
-    onChange && onChange(list);
-  };
-
   const shown = categories.filter((c) => c.type === manageType);
 
   const handlePickColor = async (id, color) => {
-    const updated = await updateCategory(id, { color });
-    refresh(updated);
+    setCategories(await updateCategory(id, { color }));
   };
-
   const handleDelete = async (id) => {
-    const updated = await deleteCategory(id);
-    refresh(updated);
+    setCategories(await deleteCategory(id));
   };
-
   const handleAdd = async () => {
     if (!newLabel.trim()) return;
     const id = newLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now();
-    const updated = await addCategory({
+    setCategories(await addCategory({
       id, label: newLabel.trim(), icon: newIcon.trim() || '◦', color: newColor, type: manageType,
-    });
-    refresh(updated);
+    }));
     setNewLabel('');
     setNewIcon('');
   };
@@ -46,38 +29,22 @@ export default function CategoryManager({ onChange }) {
   return (
     <View style={{ maxHeight: 460 }}>
       <View style={styles.typeRow}>
-        <TouchableOpacity
-          style={[styles.typeBtn, manageType === 'expense' && styles.typeBtnActive]}
-          onPress={() => setManageType('expense')}
-        >
+        <TouchableOpacity style={[styles.typeBtn, manageType === 'expense' && styles.typeBtnActive]} onPress={() => setManageType('expense')}>
           <Text style={{ color: '#F4EFE6' }}>Spent tags</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.typeBtn, manageType === 'income' && styles.typeBtnActive]}
-          onPress={() => setManageType('income')}
-        >
+        <TouchableOpacity style={[styles.typeBtn, manageType === 'income' && styles.typeBtnActive]} onPress={() => setManageType('income')}>
           <Text style={{ color: '#F4EFE6' }}>Earned tags</Text>
         </TouchableOpacity>
       </View>
-
       <ScrollView style={{ maxHeight: 240 }}>
         {shown.map((c) => (
           <View key={c.id} style={styles.catRow}>
-            <View style={[styles.swatch, { backgroundColor: c.color + '33' }]}>
-              <Text>{c.icon}</Text>
-            </View>
+            <View style={[styles.swatch, { backgroundColor: c.color + '33' }]}><Text>{c.icon}</Text></View>
             <Text style={styles.catName}>{c.label}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
               {COLOR_PALETTE.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  onPress={() => handlePickColor(c.id, color)}
-                  style={[
-                    styles.dot,
-                    { backgroundColor: color },
-                    c.color === color && styles.dotSelected,
-                  ]}
-                />
+                <TouchableOpacity key={color} onPress={() => handlePickColor(c.id, color)}
+                  style={[styles.dot, { backgroundColor: color }, c.color === color && styles.dotSelected]} />
               ))}
             </ScrollView>
             <TouchableOpacity onPress={() => handleDelete(c.id)}>
@@ -86,33 +53,15 @@ export default function CategoryManager({ onChange }) {
           </View>
         ))}
       </ScrollView>
-
       <View style={styles.addRow}>
-        <TextInput
-          style={styles.iconInput}
-          placeholder="🙂"
-          placeholderTextColor="#5E6F68"
-          value={newIcon}
-          onChangeText={setNewIcon}
-        />
-        <TextInput
-          style={styles.labelInput}
-          placeholder="New tag name"
-          placeholderTextColor="#5E6F68"
-          value={newLabel}
-          onChangeText={setNewLabel}
-        />
-        <TouchableOpacity onPress={handleAdd} style={styles.addBtn}>
-          <Text style={{ color: '#1B1200', fontWeight: '600' }}>Add</Text>
-        </TouchableOpacity>
+        <TextInput style={styles.iconInput} placeholder="🙂" placeholderTextColor="#5E6F68" value={newIcon} onChangeText={setNewIcon} />
+        <TextInput style={styles.labelInput} placeholder="New tag name" placeholderTextColor="#5E6F68" value={newLabel} onChangeText={setNewLabel} />
+        <TouchableOpacity onPress={handleAdd} style={styles.addBtn}><Text style={{ color: '#1B1200', fontWeight: '600' }}>Add</Text></TouchableOpacity>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
         {COLOR_PALETTE.map((color) => (
-          <TouchableOpacity
-            key={color}
-            onPress={() => setNewColor(color)}
-            style={[styles.dot, { backgroundColor: color }, newColor === color && styles.dotSelected]}
-          />
+          <TouchableOpacity key={color} onPress={() => setNewColor(color)}
+            style={[styles.dot, { backgroundColor: color }, newColor === color && styles.dotSelected]} />
         ))}
       </ScrollView>
     </View>
