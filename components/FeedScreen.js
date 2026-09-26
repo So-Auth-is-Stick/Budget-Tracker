@@ -4,6 +4,7 @@ import { loadTransactions, addTransaction, deleteTransaction } from './storage';
 import CategoryManager from './CategoryManager';
 import TransactionRow from './TransactionRow';
 import TransactionDetailModal from './TransactionDetailModal';
+import { todayStr } from './dateUtils';
 
 export default function FeedScreen({ categories, setCategories }) {
   const [transactions, setTransactions] = useState([]);
@@ -17,8 +18,10 @@ export default function FeedScreen({ categories, setCategories }) {
 
   useEffect(() => { loadTransactions().then(setTransactions); }, []);
 
-  const balance = transactions.reduce((sum, t) => t.type === 'income' ? sum + t.amount : sum - t.amount, 0);
-
+  const todaySpend = transactions
+  .filter((t) => t.type === 'expense' && t.date === todayStr())
+  .reduce((sum, t) => sum + t.amount, 0);
+  
   const handleSave = async () => {
     const value = parseFloat(amount);
     if (!value || value <= 0 || !selectedCategoryId) return;
