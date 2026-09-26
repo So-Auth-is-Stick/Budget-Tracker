@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import PinScreen from './components/PinScreen';
 import FeedScreen from './components/FeedScreen';
 import CalendarScreen from './components/CalendarScreen';
+import { loadCategories } from './components/categories';
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(false);
   const [tab, setTab] = useState('feed');
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    loadCategories().then(setCategories);
+  }, []);
 
   if (!unlocked) {
     return <PinScreen onUnlock={() => setUnlocked(true)} />;
@@ -14,8 +20,11 @@ export default function App() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0F1A18' }}>
-      {tab === 'feed' ? <FeedScreen /> : <CalendarScreen />}
-
+      {tab === 'feed' ? (
+        <FeedScreen categories={categories} setCategories={setCategories} />
+      ) : (
+        <CalendarScreen categories={categories} />
+      )}
       <View style={styles.tabBar}>
         <TouchableOpacity onPress={() => setTab('feed')} style={styles.tabBtn}>
           <Text style={{ color: tab === 'feed' ? '#E8B84B' : '#9FB0A8' }}>Feed</Text>
