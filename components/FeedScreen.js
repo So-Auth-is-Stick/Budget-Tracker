@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal } 
 import { loadTransactions, addTransaction, deleteTransaction } from './storage';
 import { Modal as RNModal } from 'react-native';
 import CategoryManager from './CategoryManager';
+import { ScrollView } from 'react-native';
 import { loadCategories, findCategory } from './categories';
 
 export default function FeedScreen() {
