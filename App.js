@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
 import PinScreen from './components/PinScreen';
+import FeedScreen from './components/FeedScreen';
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(false);
@@ -9,18 +9,5 @@ export default function App() {
     return <PinScreen onUnlock={() => setUnlocked(true)} />;
   }
 
-  return (
-    <View style={styles.container}>
-      <Text style={{ color: '#F4EFE6' }}>You're in! (Feed screen comes next)</Text>
-    </View>
-  );
+  return <FeedScreen />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F1A18',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
