@@ -46,12 +46,16 @@ export default function FeedScreen({ categories, setCategories, transactions, se
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setPinModalVisible(true)}><Text style={{ fontSize: 18 }}>⚙️</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setCategoryModalVisible(true)}><Text style={{ fontSize: 18 }}>🏷️</Text></TouchableOpacity>
+      <View style={styles.topRow}>
+        <View style={styles.iconCol}>
+          <TouchableOpacity onPress={() => setPinModalVisible(true)}><Text style={{ fontSize: 18 }}>⚙️</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setCategoryModalVisible(true)}><Text style={{ fontSize: 18 }}>🏷️</Text></TouchableOpacity>
+        </View>
+        <View style={styles.balanceCol}>
+          <Text style={styles.label}>Balance</Text>
+          <Text style={styles.balance}>₱{balance.toFixed(2)}</Text>
+        </View>
       </View>
-      <Text style={styles.label}>Balance</Text>
-      <Text style={styles.balance}>₱{balance.toFixed(2)}</Text>
 
       <View style={styles.statRow}>
         <Text style={styles.statLabel}>Spent today</Text>
@@ -65,11 +69,17 @@ export default function FeedScreen({ categories, setCategories, transactions, se
       <View style={styles.searchRow}>
         <TextInput style={styles.searchInput} placeholder="Search description or tag" placeholderTextColor="#5E6F68" value={searchText} onChangeText={setSearchText} />
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10, paddingLeft: 20 }}>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterScrollContent}
+        style={styles.filterScroll}
+      >
         {categories.map((c) => (
           <TouchableOpacity key={c.id} onPress={() => setActiveFilterCat(activeFilterCat === c.id ? null : c.id)}
             style={[styles.filterChip, activeFilterCat === c.id && { backgroundColor: c.color, borderColor: c.color }]}>
-            <Text style={{ color: activeFilterCat === c.id ? '#1B1200' : '#F4EFE6', fontSize: 12.5 }}>{c.icon} {c.label}</Text>
+            <Text style={[styles.filterChipText, activeFilterCat === c.id && { color: '#1B1200' }]}>{c.icon} {c.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -132,18 +142,27 @@ export default function FeedScreen({ categories, setCategories, transactions, se
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F1A18', alignItems: 'center', paddingTop: 60 },
-  header: { flexDirection: 'row', justifyContent: 'flex-end', gap: 14, width: '100%', paddingHorizontal: 20, marginBottom: 8 },
+  container: { flex: 1, backgroundColor: '#0F1A18', paddingTop: 60 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, marginBottom: 16 },
+  iconCol: { flexDirection: 'row', gap: 16, paddingTop: 8 },
+  balanceCol: { alignItems: 'flex-end' },
   label: { color: '#9FB0A8', fontSize: 13 },
-  balance: { color: '#F4EFE6', fontSize: 40, marginBottom: 14 },
+  balance: { color: '#F4EFE6', fontSize: 46, fontWeight: '700' },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', paddingHorizontal: 20, marginBottom: 6 },
   statLabel: { color: '#9FB0A8', fontSize: 13.5 },
   statValue: { color: '#D97A55', fontSize: 15, fontWeight: '600' },
   searchRow: { width: '100%', paddingHorizontal: 20, marginTop: 14, marginBottom: 10 },
   searchInput: { backgroundColor: '#1D2E27', borderRadius: 12, color: '#F4EFE6', padding: 10, fontSize: 13.5 },
-  filterChip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: '#2A3B34', backgroundColor: '#1D2E27', marginRight: 8 },
+  filterScroll: { height: 46, marginBottom: 12 },
+  filterScrollContent: { alignItems: 'center', paddingLeft: 20, paddingRight: 8 },
+  filterChip: {
+    paddingVertical: 10, paddingHorizontal: 14, borderRadius: 18,
+    borderWidth: 1, borderColor: '#2A3B34', backgroundColor: '#1D2E27',
+    marginRight: 8, minHeight: 36, justifyContent: 'center', alignItems: 'center',
+  },
+  filterChipText: { color: '#F4EFE6', fontSize: 12.5, includeFontPadding: false, textAlignVertical: 'center' },
   empty: { color: '#5E6F68', textAlign: 'center', marginTop: 30 },
-  fab: { position: 'absolute', bottom: 100, backgroundColor: '#E8B84B', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 16 },
+  fab: { position: 'absolute', bottom: 100, left: '50%', transform: [{ translateX: -110 }], backgroundColor: '#E8B84B', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 16 },
   fabText: { color: '#1B1200', fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#16241F', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20 },
