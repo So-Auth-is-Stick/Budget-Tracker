@@ -41,14 +41,14 @@ export default function App() {
         <BudgetScreen categories={categories} setCategories={setCategories} transactions={transactions} goals={goals} setGoals={setGoals} />
       )}
       <View style={styles.tabBar}>
+        <TouchableOpacity onPress={() => setTab('budget')} style={styles.tabBtn}>
+          <Text style={{ color: tab === 'budget' ? '#E8B84B' : '#9FB0A8' }}>Budget</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => setTab('main')} style={styles.tabBtn}>
           <Text style={{ color: tab === 'main' ? '#E8B84B' : '#9FB0A8' }}>Balance</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setTab('cal')} style={styles.tabBtn}>
           <Text style={{ color: tab === 'cal' ? '#E8B84B' : '#9FB0A8' }}>Calendar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setTab('budget')} style={styles.tabBtn}>
-          <Text style={{ color: tab === 'budget' ? '#E8B84B' : '#9FB0A8' }}>Budget</Text>
         </TouchableOpacity>
       </View>
     </View>
