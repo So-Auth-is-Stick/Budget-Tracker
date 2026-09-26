@@ -17,7 +17,7 @@ export default function FeedScreen({ categories, setCategories }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
   useEffect(() => { loadTransactions().then(setTransactions); }, []);
-
+  const balance = transactions.reduce((sum, t) => t.type === 'income' ? sum + t.amount : sum - t.amount, 0);
   const todaySpend = transactions
   .filter((t) => t.type === 'expense' && t.date === todayStr())
   .reduce((sum, t) => sum + t.amount, 0);
@@ -40,7 +40,10 @@ export default function FeedScreen({ categories, setCategories }) {
       </View>
       <Text style={styles.label}>Balance</Text>
       <Text style={styles.balance}>₱{balance.toFixed(2)}</Text>
-
+      <View style={styles.statRow}>
+        <Text style={styles.statLabel}>Spent today</Text>
+        <Text style={styles.statValue}>₱{todaySpend.toFixed(2)}</Text>
+      </View>
       <FlatList
         data={[...transactions].reverse()}
         keyExtractor={(item) => String(item.id)}
@@ -67,7 +70,7 @@ export default function FeedScreen({ categories, setCategories }) {
                 <Text style={{ color: '#F4EFE6' }}>Earned</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 16 }}>
               {categories.filter((c) => c.type === type).map((c) => (
                 <TouchableOpacity key={c.id} onPress={() => setSelectedCategoryId(c.id)}
                   style={[styles.chip, selectedCategoryId === c.id && { backgroundColor: c.color, borderColor: c.color }]}>
@@ -100,6 +103,12 @@ export default function FeedScreen({ categories, setCategories }) {
 }
 
 const styles = StyleSheet.create({
+  statRow: {
+    flexDirection: 'row', justifyContent: 'space-between', width: '100%',
+    paddingHorizontal: 20, marginBottom: 18,
+  },
+  statLabel: { color: '#9FB0A8', fontSize: 13.5 },
+  statValue: { color: '#D97A55', fontSize: 15, fontWeight: '600' },
   container: { flex: 1, backgroundColor: '#0F1A18', alignItems: 'center', paddingTop: 60 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 20, marginBottom: 8 },
   headerHello: { color: '#9FB0A8', fontSize: 14 },

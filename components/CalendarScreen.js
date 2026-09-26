@@ -12,7 +12,16 @@ export default function CalendarScreen({ categories }) {
   const [detailItem, setDetailItem] = useState(null);
 
   useEffect(() => { loadTransactions().then(setTransactions); }, []);
-
+  const refDate = selectedDate || todayStr();
+  const { start, end } = getWeekRange(refDate);
+  const weeklySpend = transactions
+    .filter((t) => t.type === 'expense' && t.date >= start && t.date <= end)
+    .reduce((sum, t) => sum + t.amount, 0);
+  const dailySpend = selectedDate
+    ? transactions
+        .filter((t) => t.type === 'expense' && t.date === selectedDate)
+        .reduce((sum, t) => sum + t.amount, 0)
+    : 0;
   const summaryByDate = transactions.reduce((acc, t) => {
     if (!acc[t.date]) acc[t.date] = { income: false, expense: false };
     acc[t.date][t.type] = true;
@@ -21,16 +30,6 @@ export default function CalendarScreen({ categories }) {
 
   const markedDates = Object.keys(summaryByDate).reduce((acc, date) => {
     const dots = [];
-    const refDate = selectedDate || todayStr();
-    const { start, end } = getWeekRange(refDate);
-    const weeklySpend = transactions
-      .filter((t) => t.type === 'expense' && t.date >= start && t.date <= end)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const dailySpend = selectedDate
-      ? transactions
-          .filter((t) => t.type === 'expense' && t.date === selectedDate)
-          .reduce((sum, t) => sum + t.amount, 0)
-      : 0;
     if (summaryByDate[date].income) dots.push({ key: 'in', color: '#7FC29B' });
     if (summaryByDate[date].expense) dots.push({ key: 'out', color: '#D97A55' });
     acc[date] = { dots, marked: true };
