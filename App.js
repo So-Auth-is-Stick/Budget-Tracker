@@ -3,15 +3,19 @@ import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import PinScreen from './components/PinScreen';
 import FeedScreen from './components/FeedScreen';
 import CalendarScreen from './components/CalendarScreen';
+import BudgetScreen from './components/BudgetScreen';
 import { loadCategories } from './components/categories';
+import { loadTransactions } from './components/storage';
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(false);
-  const [tab, setTab] = useState('feed');
+  const [tab, setTab] = useState('main');
   const [categories, setCategories] = useState([]);
+  const [transactions, setTransactions] = useState([]);
 
   useEffect(() => {
     loadCategories().then(setCategories);
+    loadTransactions().then(setTransactions);
   }, []);
 
   if (!unlocked) {
@@ -20,17 +24,28 @@ export default function App() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0F1A18' }}>
-      {tab === 'feed' ? (
-        <FeedScreen categories={categories} setCategories={setCategories} />
-      ) : (
-        <CalendarScreen categories={categories} />
+      {tab === 'main' && (
+        <FeedScreen
+          categories={categories} setCategories={setCategories}
+          transactions={transactions} setTransactions={setTransactions}
+        />
       )}
+      {tab === 'cal' && (
+        <CalendarScreen categories={categories} transactions={transactions} setTransactions={setTransactions} />
+      )}
+      {tab === 'budget' && (
+        <BudgetScreen categories={categories} setCategories={setCategories} transactions={transactions} />
+      )}
+
       <View style={styles.tabBar}>
-        <TouchableOpacity onPress={() => setTab('feed')} style={styles.tabBtn}>
-          <Text style={{ color: tab === 'feed' ? '#E8B84B' : '#9FB0A8' }}>Feed</Text>
+        <TouchableOpacity onPress={() => setTab('main')} style={styles.tabBtn}>
+          <Text style={{ color: tab === 'main' ? '#E8B84B' : '#9FB0A8' }}>Balance</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setTab('cal')} style={styles.tabBtn}>
           <Text style={{ color: tab === 'cal' ? '#E8B84B' : '#9FB0A8' }}>Calendar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setTab('budget')} style={styles.tabBtn}>
+          <Text style={{ color: tab === 'budget' ? '#E8B84B' : '#9FB0A8' }}>Budget</Text>
         </TouchableOpacity>
       </View>
     </View>
