@@ -62,6 +62,7 @@ export default function CalendarScreen() {
           <FlatList
             data={dayTransactions}
             keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={{ paddingBottom: 100 }}
             renderItem={({ item }) => (
               <View style={styles.row}>
                 <Text style={{ color: item.type === 'income' ? '#7FC29B' : '#D97A55' }}>

@@ -45,6 +45,7 @@ export default function FeedScreen() {
         data={[...transactions].reverse()}
         keyExtractor={(item) => String(item.id)}
         style={{ width: '100%' }}
+        contentContainerStyle={{ paddingBottom: 160 }}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <Text style={{ color: item.type === 'income' ? '#7FC29B' : '#D97A55' }}>
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
   date: { color: '#5E6F68', fontSize: 12 },
   empty: { color: '#5E6F68', textAlign: 'center', marginTop: 30 },
   fab: {
-    position: 'absolute', bottom: 40, backgroundColor: '#E8B84B',
+    position: 'absolute', bottom: 100, backgroundColor: '#E8B84B',
     paddingVertical: 14, paddingHorizontal: 28, borderRadius: 16,
   },
   fabText: { color: '#1B1200', fontWeight: '600' },
