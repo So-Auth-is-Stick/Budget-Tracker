@@ -24,3 +24,10 @@ export async function deleteTransaction(id) {
   await saveTransactions(filtered);
   return filtered;
 }
+
+export async function updateTransaction(id, changes) {
+  const list = await loadTransactions();
+  const updated = list.map((t) => (t.id === id ? { ...t, ...changes } : t));
+  await saveTransactions(updated);
+  return updated;
+}
