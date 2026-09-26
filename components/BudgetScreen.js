@@ -24,6 +24,11 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
   const spentThisMonth = (categoryId) =>
     transactions.filter((t) => t.type === 'expense' && t.category === categoryId && monthOf(t.date) === currentMonth).reduce((sum, t) => sum + t.amount, 0);
 
+  const totalMonthlyBudget = expenseCats.reduce((s, c) => s + (c.budget || 0), 0);
+  const totalMonthlySpent = expenseCats.reduce((s, c) => s + spentThisMonth(c.id), 0);
+  const heroPct = totalMonthlyBudget > 0 ? Math.min(100, (totalMonthlySpent / totalMonthlyBudget) * 100) : 0;
+  const heroOver = totalMonthlyBudget > 0 && totalMonthlySpent > totalMonthlyBudget;
+
   const openLimitModal = (cat) => {
     setLimitModalCat(cat);
     setDailyInput(cat.dailyBudget ? String(cat.dailyBudget) : '');
@@ -59,6 +64,20 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: 160 }}>
+
+        <View style={styles.heroCard}>
+          <Text style={styles.heroLabel}>Spent this month</Text>
+          <Text style={styles.heroAmt}>
+            ₱{totalMonthlySpent.toFixed(0)}
+            {totalMonthlyBudget > 0 && <Text style={styles.heroOf}>  of ₱{totalMonthlyBudget.toFixed(0)} budgeted</Text>}
+          </Text>
+          {totalMonthlyBudget > 0 && (
+            <View style={styles.heroTrack}>
+              <View style={[styles.heroFill, { width: `${heroPct}%`, backgroundColor: heroOver ? '#D97A55' : '#E8B84B' }]} />
+            </View>
+          )}
+        </View>
+
         <Text style={styles.sectionTitle}>Spending limits</Text>
         {expenseCats.length === 0 && <Text style={styles.empty}>No spending tags yet.</Text>}
         {expenseCats.map((cat) => {
@@ -72,8 +91,15 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
           const monthOver = monthlyBudget > 0 && monthSpent > monthlyBudget;
           const hasAnyLimit = dailyBudget > 0 || monthlyBudget > 0;
           return (
-            <TouchableOpacity key={cat.id} style={styles.budgetRow} onPress={() => openLimitModal(cat)}>
-              <Text style={styles.budgetName}>{cat.icon} {cat.label}</Text>
+            <TouchableOpacity
+              key={cat.id}
+              style={[styles.card, { backgroundColor: cat.color + '14', borderColor: cat.color + '40' }]}
+              onPress={() => openLimitModal(cat)}
+            >
+              <View style={styles.cardHeader}>
+                <View style={[styles.iconCircle, { backgroundColor: cat.color + '30' }]}><Text style={{ fontSize: 16 }}>{cat.icon}</Text></View>
+                <Text style={styles.budgetName}>{cat.label}</Text>
+              </View>
               {!hasAnyLimit && <Text style={styles.noLimit}>No limits set — tap to add one</Text>}
               {dailyBudget > 0 && (
                 <View style={styles.limitBlock}>
@@ -100,7 +126,7 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
             </TouchableOpacity>
           );
         })}
-        <View style={styles.divider} />
+
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Savings & upcoming payments</Text>
           <TouchableOpacity onPress={openAddGoal}><Text style={styles.addLink}>+ Add</Text></TouchableOpacity>
@@ -109,12 +135,17 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
         {goals.map((g) => {
           const pct = Math.min(100, (g.savedAmount / g.targetAmount) * 100);
           return (
-            <TouchableOpacity key={g.id} style={styles.budgetRow} onLongPress={() => confirmDeleteGoal(g)} onPress={() => openAddFunds(g)}>
-              <View style={styles.budgetTop}>
+            <TouchableOpacity key={g.id} style={[styles.card, { backgroundColor: '#E8B84B14', borderColor: '#E8B84B40' }]}
+              onLongPress={() => confirmDeleteGoal(g)} onPress={() => openAddFunds(g)}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.iconCircle, { backgroundColor: '#E8B84B30' }]}><Text style={{ fontSize: 16 }}>🎯</Text></View>
                 <Text style={styles.budgetName}>{g.label}</Text>
-                <Text style={styles.limitAmt}>₱{g.savedAmount.toFixed(0)} / ₱{g.targetAmount.toFixed(0)}</Text>
               </View>
               {!!g.note && <Text style={styles.goalNote}>{g.note}</Text>}
+              <View style={styles.limitTop}>
+                <Text style={styles.limitLabel}>Saved</Text>
+                <Text style={styles.limitAmt}>₱{g.savedAmount.toFixed(0)} / ₱{g.targetAmount.toFixed(0)}</Text>
+              </View>
               <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: '#E8B84B' }]} /></View>
             </TouchableOpacity>
           );
@@ -163,23 +194,29 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F1A18', paddingTop: 60 },
+  heroCard: { backgroundColor: '#1D2E27', borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 24 },
+  heroLabel: { color: '#9FB0A8', fontSize: 13, marginBottom: 6 },
+  heroAmt: { color: '#F4EFE6', fontSize: 30, fontWeight: '700', marginBottom: 12 },
+  heroOf: { color: '#9FB0A8', fontSize: 14, fontWeight: '400' },
+  heroTrack: { height: 9, backgroundColor: '#0F1A18', borderRadius: 5, overflow: 'hidden' },
+  heroFill: { height: '100%', borderRadius: 5 },
   sectionTitle: { color: '#9FB0A8', fontSize: 13, paddingHorizontal: 20, marginBottom: 10 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 8 },
   addLink: { color: '#E8B84B', fontSize: 13, fontWeight: '600', marginBottom: 10 },
   empty: { color: '#5E6F68', fontSize: 13, paddingHorizontal: 20, marginBottom: 10 },
-  divider: { height: 1, backgroundColor: '#2A3B34', marginVertical: 22, marginHorizontal: 20 },
-  budgetRow: { paddingHorizontal: 20, paddingVertical: 12 },
-  budgetTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  budgetName: { color: '#F4EFE6', fontSize: 14.5, marginBottom: 8 },
-  noLimit: { color: '#5E6F68', fontSize: 12, marginBottom: 4 },
-  limitBlock: { marginBottom: 8 },
+  card: { borderRadius: 16, borderWidth: 1, padding: 16, marginHorizontal: 20, marginBottom: 12 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  iconCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  budgetName: { color: '#F4EFE6', fontSize: 15, fontWeight: '600' },
+  noLimit: { color: '#5E6F68', fontSize: 12, marginBottom: 2 },
+  limitBlock: { marginTop: 6 },
   limitTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  limitLabel: { color: '#5E6F68', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.5 },
-  limitAmt: { color: '#9FB0A8', fontSize: 13 },
-  goalNote: { color: '#5E6F68', fontSize: 12, marginBottom: 6 },
-  track: { height: 7, backgroundColor: '#1D2E27', borderRadius: 4, overflow: 'hidden' },
+  limitLabel: { color: '#9FB0A8', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.5 },
+  limitAmt: { color: '#F4EFE6', fontSize: 13 },
+  goalNote: { color: '#9FB0A8', fontSize: 12, marginBottom: 8 },
+  track: { height: 7, backgroundColor: '#0F1A18', borderRadius: 4, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 4 },
-  hint: { color: '#5E6F68', fontSize: 11.5, paddingHorizontal: 20, marginTop: 10 },
+  hint: { color: '#5E6F68', fontSize: 11.5, paddingHorizontal: 20, marginTop: 6 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#16241F', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22 },
   sheetTitle: { color: '#F4EFE6', fontSize: 16, marginBottom: 16 },
