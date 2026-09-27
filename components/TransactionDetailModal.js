@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, Image, StyleSheet, Alert } from 'react-native';
 import { findCategory } from './categories';
+import { pickFromLibrary, takePhoto } from './imageStorage';
 
 export default function TransactionDetailModal({ visible, item, categories, onClose, onDelete, onSave }) {
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [categoryId, setCategoryId] = useState(null);
+  const [photoUri, setPhotoUri] = useState(null);
 
   useEffect(() => {
     if (item) {
       setAmount(String(item.amount));
       setNote(item.note || '');
       setCategoryId(item.category);
+      setPhotoUri(item.photoUri || null);
       setEditing(false);
     }
   }, [item]);
@@ -29,10 +32,20 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
     ]);
   };
 
+  const choosePhoto = () => {
+    const options = [
+      { text: 'Take Photo', onPress: async () => { const uri = await takePhoto(); if (uri) setPhotoUri(uri); } },
+      { text: 'Choose from Library', onPress: async () => { const uri = await pickFromLibrary(); if (uri) setPhotoUri(uri); } },
+    ];
+    if (photoUri) options.push({ text: 'Remove photo', style: 'destructive', onPress: () => setPhotoUri(null) });
+    options.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Attach a photo', undefined, options);
+  };
+
   const handleSaveEdit = () => {
     const value = parseFloat(amount);
     if (!value || value <= 0 || !categoryId) return;
-    onSave(item.id, { amount: value, note: note.trim(), category: categoryId });
+    onSave(item.id, { amount: value, note: note.trim(), category: categoryId, photoUri: photoUri || null });
     setEditing(false);
     onClose();
   };
@@ -48,6 +61,7 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
               <Text style={styles.date}>{item.date}</Text>
               <Text style={styles.noteLabel}>Description</Text>
               <Text style={styles.note}>{item.note ? item.note : 'No description added.'}</Text>
+              {!!item.photoUri && <Image source={{ uri: item.photoUri }} style={styles.photo} resizeMode="cover" />}
               <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
                 <Text style={{ color: '#E8B84B', fontWeight: '600' }}>Edit this entry</Text>
               </TouchableOpacity>
@@ -71,6 +85,10 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
               </ScrollView>
               <TextInput style={styles.input} keyboardType="decimal-pad" value={amount} onChangeText={setAmount} />
               <TextInput style={styles.textField} placeholder="Description" placeholderTextColor="#5E6F68" value={note} onChangeText={setNote} />
+              {!!photoUri && <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />}
+              <TouchableOpacity style={styles.photoBtn} onPress={choosePhoto}>
+                <Text style={{ color: '#F4EFE6' }}>{photoUri ? 'Change photo' : '📎 Attach a photo'}</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}>
                 <Text style={{ color: '#1B1200', fontWeight: '600' }}>Save changes</Text>
               </TouchableOpacity>
@@ -92,7 +110,9 @@ const styles = StyleSheet.create({
   amount: { fontSize: 36, fontWeight: '600', marginBottom: 4 },
   date: { color: '#9FB0A8', fontSize: 13, marginBottom: 18 },
   noteLabel: { color: '#5E6F68', fontSize: 12, marginBottom: 4 },
-  note: { color: '#F4EFE6', fontSize: 14.5, marginBottom: 20 },
+  note: { color: '#F4EFE6', fontSize: 14.5, marginBottom: 14 },
+  photo: { width: '100%', height: 200, borderRadius: 14, marginBottom: 16, backgroundColor: '#1D2E27' },
+  photoBtn: { backgroundColor: '#1D2E27', borderRadius: 12, padding: 12, alignItems: 'center', marginBottom: 16 },
   editBtn: { borderColor: '#E8B84B', borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: 10 },
   deleteBtn: { borderColor: '#D97A55', borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   chip: { paddingVertical: 8, paddingHorizontal: 13, borderRadius: 20, borderWidth: 1, borderColor: '#2A3B34', backgroundColor: '#1D2E27', marginRight: 8 },
