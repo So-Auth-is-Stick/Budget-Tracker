@@ -1,19 +1,12 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { updateCategory } from './categories';
-import { addGoal, updateGoal, deleteGoal } from './goals';
 import { todayStr, monthOf } from './dateUtils';
 
-export default function BudgetScreen({ categories, setCategories, transactions, goals, setGoals }) {
+export default function BudgetScreen({ categories, setCategories, transactions }) {
   const [limitModalCat, setLimitModalCat] = useState(null);
   const [dailyInput, setDailyInput] = useState('');
   const [monthlyInput, setMonthlyInput] = useState('');
-  const [addGoalVisible, setAddGoalVisible] = useState(false);
-  const [newGoalLabel, setNewGoalLabel] = useState('');
-  const [newGoalTarget, setNewGoalTarget] = useState('');
-  const [newGoalNote, setNewGoalNote] = useState('');
-  const [fundsModalGoal, setFundsModalGoal] = useState(null);
-  const [fundsInput, setFundsInput] = useState('');
 
   const today = todayStr();
   const currentMonth = monthOf(today);
@@ -39,26 +32,6 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
     const monthly = parseFloat(monthlyInput);
     setCategories(await updateCategory(limitModalCat.id, { dailyBudget: daily > 0 ? daily : 0, budget: monthly > 0 ? monthly : 0 }));
     setLimitModalCat(null);
-  };
-  const openAddGoal = () => { setNewGoalLabel(''); setNewGoalTarget(''); setNewGoalNote(''); setAddGoalVisible(true); };
-  const saveNewGoal = async () => {
-    const target = parseFloat(newGoalTarget);
-    if (!newGoalLabel.trim() || !target || target <= 0) return;
-    setGoals(await addGoal({ id: 'goal_' + Date.now(), label: newGoalLabel.trim(), targetAmount: target, savedAmount: 0, note: newGoalNote.trim() }));
-    setAddGoalVisible(false);
-  };
-  const openAddFunds = (goal) => { setFundsModalGoal(goal); setFundsInput(''); };
-  const saveFunds = async () => {
-    const value = parseFloat(fundsInput);
-    if (!value || value <= 0) return;
-    setGoals(await updateGoal(fundsModalGoal.id, { savedAmount: fundsModalGoal.savedAmount + value }));
-    setFundsModalGoal(null);
-  };
-  const confirmDeleteGoal = (goal) => {
-    Alert.alert('Delete this goal?', goal.label, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => setGoals(await deleteGoal(goal.id)) },
-    ]);
   };
 
   return (
@@ -126,31 +99,6 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
             </TouchableOpacity>
           );
         })}
-
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Savings & upcoming payments</Text>
-          <TouchableOpacity onPress={openAddGoal}><Text style={styles.addLink}>+ Add</Text></TouchableOpacity>
-        </View>
-        {goals.length === 0 && <Text style={styles.empty}>Nothing set aside yet.</Text>}
-        {goals.map((g) => {
-          const pct = Math.min(100, (g.savedAmount / g.targetAmount) * 100);
-          return (
-            <TouchableOpacity key={g.id} style={[styles.card, { backgroundColor: '#E8B84B14', borderColor: '#E8B84B40' }]}
-              onLongPress={() => confirmDeleteGoal(g)} onPress={() => openAddFunds(g)}>
-              <View style={styles.cardHeader}>
-                <View style={[styles.iconCircle, { backgroundColor: '#E8B84B30' }]}><Text style={{ fontSize: 16 }}>🎯</Text></View>
-                <Text style={styles.budgetName}>{g.label}</Text>
-              </View>
-              {!!g.note && <Text style={styles.goalNote}>{g.note}</Text>}
-              <View style={styles.limitTop}>
-                <Text style={styles.limitLabel}>Saved</Text>
-                <Text style={styles.limitAmt}>₱{g.savedAmount.toFixed(0)} / ₱{g.targetAmount.toFixed(0)}</Text>
-              </View>
-              <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: '#E8B84B' }]} /></View>
-            </TouchableOpacity>
-          );
-        })}
-        <Text style={styles.hint}>Tap a goal to add funds. Long-press to delete.</Text>
       </ScrollView>
 
       <Modal visible={!!limitModalCat} animationType="slide" transparent>
@@ -163,28 +111,6 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
             <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="e.g. 5000" placeholderTextColor="#5E6F68" value={monthlyInput} onChangeText={setMonthlyInput} />
             <TouchableOpacity style={styles.saveBtn} onPress={saveLimits}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => setLimitModalCat(null)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      <Modal visible={addGoalVisible} animationType="slide" transparent>
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>New savings goal</Text>
-            <TextInput style={styles.textField} placeholder="Name (e.g. Emergency fund, New phone)" placeholderTextColor="#5E6F68" value={newGoalLabel} onChangeText={setNewGoalLabel} />
-            <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="Target amount" placeholderTextColor="#5E6F68" value={newGoalTarget} onChangeText={setNewGoalTarget} />
-            <TextInput style={styles.textField} placeholder="Note (optional, e.g. 'due December')" placeholderTextColor="#5E6F68" value={newGoalNote} onChangeText={setNewGoalNote} />
-            <TouchableOpacity style={styles.saveBtn} onPress={saveNewGoal}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => setAddGoalVisible(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      <Modal visible={!!fundsModalGoal} animationType="slide" transparent>
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Add funds — {fundsModalGoal?.label}</Text>
-            <TextInput style={styles.input} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor="#5E6F68" value={fundsInput} onChangeText={setFundsInput} autoFocus />
-            <TouchableOpacity style={styles.saveBtn} onPress={saveFunds}><Text style={styles.saveBtnText}>Add</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => setFundsModalGoal(null)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -201,7 +127,6 @@ const styles = StyleSheet.create({
   heroTrack: { height: 9, backgroundColor: '#0F1A18', borderRadius: 5, overflow: 'hidden' },
   heroFill: { height: '100%', borderRadius: 5 },
   sectionTitle: { color: '#9FB0A8', fontSize: 13, paddingHorizontal: 20, marginBottom: 10 },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginTop: 8 },
   addLink: { color: '#E8B84B', fontSize: 13, fontWeight: '600', marginBottom: 10 },
   empty: { color: '#5E6F68', fontSize: 13, paddingHorizontal: 20, marginBottom: 10 },
   card: { borderRadius: 16, borderWidth: 1, padding: 16, marginHorizontal: 20, marginBottom: 12 },
@@ -213,10 +138,8 @@ const styles = StyleSheet.create({
   limitTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
   limitLabel: { color: '#9FB0A8', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.5 },
   limitAmt: { color: '#F4EFE6', fontSize: 13 },
-  goalNote: { color: '#9FB0A8', fontSize: 12, marginBottom: 8 },
   track: { height: 7, backgroundColor: '#0F1A18', borderRadius: 4, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 4 },
-  hint: { color: '#5E6F68', fontSize: 11.5, paddingHorizontal: 20, marginTop: 6 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#16241F', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22 },
   sheetTitle: { color: '#F4EFE6', fontSize: 16, marginBottom: 16 },
