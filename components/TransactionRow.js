@@ -10,7 +10,7 @@ export default function TransactionRow({ item, categories, onPress }) {
     <TouchableOpacity style={styles.row} onPress={() => onPress(item)} activeOpacity={0.7}>
       <View style={[styles.colorBar, { backgroundColor: cat.color }]} />
       <View style={styles.left}>
-        <Text style={styles.tag} numberOfLines={1}>{cat.icon} {cat.label}</Text>
+        <Text style={styles.tag} numberOfLines={1}>{cat.icon} {cat.label}{item.photoUri ? ' 📷' : ''}</Text>
         {!!item.note && (
           <Text style={styles.note} numberOfLines={1} ellipsizeMode="tail">{item.note}</Text>
         )}
