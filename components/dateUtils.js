@@ -3,8 +3,8 @@ export function todayStr() {
 }
 
 export function getWeekRange(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00Z'); 
-  const day = d.getUTCDay(); 
+  const d = new Date(dateStr + 'T00:00:00Z');
+  const day = d.getUTCDay();
   const start = new Date(d);
   start.setUTCDate(d.getUTCDate() - day);
   const end = new Date(start);
@@ -12,6 +12,14 @@ export function getWeekRange(dateStr) {
   const toStr = (x) => x.toISOString().slice(0, 10);
   return { start: toStr(start), end: toStr(end) };
 }
+
 export function monthOf(dateStr) {
-  return dateStr.slice(0, 7); // "2026-09"
+  return dateStr.slice(0, 7);
+}
+
+// positive = days remaining, negative = overdue, 0 = today
+export function daysUntil(dateStr) {
+  const target = new Date(dateStr + 'T00:00:00Z');
+  const today = new Date(todayStr() + 'T00:00:00Z');
+  return Math.round((target - today) / 86400000);
 }
