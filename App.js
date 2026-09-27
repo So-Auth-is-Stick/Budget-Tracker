@@ -4,6 +4,7 @@ import PinScreen from './components/PinScreen';
 import FeedScreen from './components/FeedScreen';
 import CalendarScreen from './components/CalendarScreen';
 import BudgetScreen from './components/BudgetScreen';
+import SavingsScreen from './components/SavingsScreen';
 import { loadCategories } from './components/categories';
 import { loadTransactions } from './components/storage';
 import { loadGoals } from './components/goals';
@@ -21,25 +22,19 @@ export default function App() {
     loadGoals().then(setGoals);
   }, []);
 
-  if (!unlocked) {
-    return <PinScreen onUnlock={() => setUnlocked(true)} />;
-  }
+  if (!unlocked) return <PinScreen onUnlock={() => setUnlocked(true)} />;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0F1A18' }}>
+      {tab === 'budget' && <BudgetScreen categories={categories} setCategories={setCategories} transactions={transactions} />}
       {tab === 'main' && (
-        <FeedScreen
-          categories={categories} setCategories={setCategories}
-          transactions={transactions} setTransactions={setTransactions}
-          goals={goals}
-        />
+        <FeedScreen categories={categories} setCategories={setCategories} transactions={transactions} setTransactions={setTransactions} goals={goals} />
       )}
       {tab === 'cal' && (
-        <CalendarScreen categories={categories} transactions={transactions} setTransactions={setTransactions} />
+        <CalendarScreen categories={categories} transactions={transactions} setTransactions={setTransactions} goals={goals} />
       )}
-      {tab === 'budget' && (
-        <BudgetScreen categories={categories} setCategories={setCategories} transactions={transactions} goals={goals} setGoals={setGoals} />
-      )}
+      {tab === 'savings' && <SavingsScreen goals={goals} setGoals={setGoals} />}
+
       <View style={styles.tabBar}>
         <TouchableOpacity onPress={() => setTab('budget')} style={styles.tabBtn}>
           <Text style={{ color: tab === 'budget' ? '#E8B84B' : '#9FB0A8' }}>Budget</Text>
@@ -49,6 +44,9 @@ export default function App() {
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setTab('cal')} style={styles.tabBtn}>
           <Text style={{ color: tab === 'cal' ? '#E8B84B' : '#9FB0A8' }}>Calendar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setTab('savings')} style={styles.tabBtn}>
+          <Text style={{ color: tab === 'savings' ? '#E8B84B' : '#9FB0A8' }}>Savings</Text>
         </TouchableOpacity>
       </View>
     </View>
