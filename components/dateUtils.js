@@ -1,12 +1,12 @@
-export function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export function prevMonthOf(monthStr) {
   const [y, m] = monthStr.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1, 1));
   d.setUTCMonth(d.getUTCMonth() - 1);
   return d.toISOString().slice(0, 7);
+}
+
+export function todayStr() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function getWeekRange(dateStr) {

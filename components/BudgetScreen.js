@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal, Alert } from 'react-native';
 import { updateCategory } from './categories';
-import { todayStr, monthOf } from './dateUtils';
 import { todayStr, monthOf, prevMonthOf } from './dateUtils';
 
 export default function BudgetScreen({ categories, setCategories, transactions }) {
