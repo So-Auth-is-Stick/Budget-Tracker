@@ -32,3 +32,9 @@ export async function deleteTransaction(id) {
   return filtered;
 }
 
+export async function addTransactions(newList) {
+  const list = await loadTransactions();
+  const merged = [...list, ...newList];
+  await saveTransactions(merged);
+  return merged;
+}
