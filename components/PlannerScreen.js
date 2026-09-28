@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal } from 'react-native';
 import { addGoal, updateGoal, deleteGoal } from './goals';
 import DatePickerModal from './DatePickerModal';
 import GoalDetailModal from './GoalDetailModal';
 import RecurringManager from './RecurringManager';
 import { daysUntil } from './dateUtils';
+import { useTheme } from './theme';
 
 export default function PlannerScreen({ categories, goals, setGoals, recurringRules, setRecurringRules }) {
+  const { theme: t } = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const [addVisible, setAddVisible] = useState(false);
   const [label, setLabel] = useState('');
   const [target, setTarget] = useState('');
@@ -19,14 +22,14 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
 
   const openAdd = () => { setLabel(''); setTarget(''); setNote(''); setDueDate(null); setAddVisible(true); };
   const saveNew = async () => {
-    const t = parseFloat(target);
-    if (!label.trim() || !t || t <= 0) return;
-    setGoals(await addGoal({ id: 'goal_' + Date.now(), label: label.trim(), targetAmount: t, savedAmount: 0, note: note.trim(), dueDate }));
+    const tg = parseFloat(target);
+    if (!label.trim() || !tg || tg <= 0) return;
+    setGoals(await addGoal({ id: 'goal_' + Date.now(), label: label.trim(), targetAmount: tg, savedAmount: 0, note: note.trim(), dueDate }));
     setAddVisible(false);
   };
-  const handleAddFunds = async (id, value) => {
+  const handleAdjust = async (id, delta) => {
     const g = goals.find((x) => x.id === id);
-    const updated = await updateGoal(id, { savedAmount: g.savedAmount + value });
+    const updated = await updateGoal(id, { savedAmount: Math.max(0, g.savedAmount + delta) });
     setGoals(updated);
     setDetailGoal(updated.find((x) => x.id === id));
   };
@@ -56,7 +59,7 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
                 <Text style={styles.name}>{g.label}</Text>
               </View>
               {remaining !== null && (
-                <Text style={[styles.due, remaining < 0 && { color: '#D97A55' }]}>
+                <Text style={[styles.due, remaining < 0 && { color: t.spend }]}>
                   {remaining < 0 ? `Overdue by ${Math.abs(remaining)}d` : remaining === 0 ? 'Due today' : `Due in ${remaining}d`}
                 </Text>
               )}
@@ -68,54 +71,56 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
         })}
 
         <View style={styles.divider} />
-
         <RecurringManager categories={categories} rules={recurringRules} setRules={setRecurringRules} />
       </ScrollView>
 
-      <Modal visible={addVisible} animationType="slide" transparent>
+      <Modal visible={addVisible} animationType="slide" transparent onRequestClose={() => setAddVisible(false)}>
         <View style={styles.overlay}>
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>New savings goal</Text>
-            <TextInput style={styles.textField} placeholder="Name (e.g. Emergency fund, Rent)" placeholderTextColor="#5E6F68" value={label} onChangeText={setLabel} />
-            <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="Target amount" placeholderTextColor="#5E6F68" value={target} onChangeText={setTarget} />
-            <TextInput style={styles.textField} placeholder="Note (optional)" placeholderTextColor="#5E6F68" value={note} onChangeText={setNote} />
+            <TextInput style={styles.textField} placeholder="Name (e.g. Emergency fund, Rent)" placeholderTextColor={t.inkFaint} value={label} onChangeText={setLabel} />
+            <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="Target amount" placeholderTextColor={t.inkFaint} value={target} onChangeText={setTarget} />
+            <TextInput style={styles.textField} placeholder="Note (optional)" placeholderTextColor={t.inkFaint} value={note} onChangeText={setNote} />
             <TouchableOpacity style={styles.dateBtn} onPress={() => setDatePickerVisible(true)}>
-              <Text style={{ color: '#F4EFE6' }}>{dueDate ? `Due ${dueDate}` : 'Set a due date (optional)'}</Text>
+              <Text style={{ color: t.ink }}>{dueDate ? `Due ${dueDate}` : 'Set a due date (optional)'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={saveNew}><Text style={{ color: '#1B1200', fontWeight: '600' }}>Save</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => setAddVisible(false)}><Text style={{ color: '#9FB0A8', textAlign: 'center', marginTop: 12 }}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.saveBtn} onPress={saveNew}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setAddVisible(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+            <DatePickerModal visible={datePickerVisible} initialDate={dueDate} onConfirm={(d) => { setDueDate(d); setDatePickerVisible(false); }} onClose={() => setDatePickerVisible(false)} />
           </View>
         </View>
       </Modal>
-      <DatePickerModal visible={datePickerVisible} initialDate={dueDate} onConfirm={(d) => { setDueDate(d); setDatePickerVisible(false); }} onClose={() => setDatePickerVisible(false)} />
-      <GoalDetailModal visible={!!detailGoal} goal={detailGoal} onClose={() => setDetailGoal(null)} onAddFunds={handleAddFunds} onUpdate={handleUpdate} onDelete={handleDelete} />
+
+      <GoalDetailModal visible={!!detailGoal} goal={detailGoal} onClose={() => setDetailGoal(null)} onAdjustFunds={handleAdjust} onUpdate={handleUpdate} onDelete={handleDelete} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F1A18', paddingTop: 60 },
-  heroCard: { backgroundColor: '#1D2E27', borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 20 },
-  heroLabel: { color: '#9FB0A8', fontSize: 13, marginBottom: 6 },
-  heroAmt: { color: '#E8B84B', fontSize: 30, fontWeight: '700' },
+const makeStyles = (t) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.bg, paddingTop: 60 },
+  heroCard: { backgroundColor: t.surface2, borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 20 },
+  heroLabel: { color: t.inkDim, fontSize: 13, marginBottom: 6 },
+  heroAmt: { color: t.accent, fontSize: 30, fontWeight: '700' },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { color: '#9FB0A8', fontSize: 13 },
-  addLink: { color: '#E8B84B', fontSize: 13, fontWeight: '600' },
-  empty: { color: '#5E6F68', fontSize: 13, marginBottom: 10 },
-  divider: { height: 1, backgroundColor: '#2A3B34', marginVertical: 22 },
-  card: { backgroundColor: '#E8B84B14', borderColor: '#E8B84B40', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12 },
+  sectionTitle: { color: t.inkDim, fontSize: 13 },
+  addLink: { color: t.accent, fontSize: 13, fontWeight: '600' },
+  empty: { color: t.inkFaint, fontSize: 13, marginBottom: 10 },
+  divider: { height: 1, backgroundColor: t.edge, marginVertical: 22 },
+  card: { backgroundColor: t.accent + '18', borderColor: t.accent + '55', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  iconCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#E8B84B30', alignItems: 'center', justifyContent: 'center' },
-  name: { color: '#F4EFE6', fontSize: 15, fontWeight: '600' },
-  due: { color: '#9FB0A8', fontSize: 12, marginBottom: 6 },
-  note: { color: '#9FB0A8', fontSize: 12.5, marginBottom: 8 },
-  amt: { color: '#F4EFE6', fontSize: 13, marginBottom: 6 },
-  track: { height: 7, backgroundColor: '#0F1A18', borderRadius: 4, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 4, backgroundColor: '#E8B84B' },
+  iconCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: t.accent + '35', alignItems: 'center', justifyContent: 'center' },
+  name: { color: t.ink, fontSize: 15, fontWeight: '600' },
+  due: { color: t.inkDim, fontSize: 12, marginBottom: 6 },
+  note: { color: t.inkDim, fontSize: 12.5, marginBottom: 8 },
+  amt: { color: t.ink, fontSize: 13, marginBottom: 6 },
+  track: { height: 7, backgroundColor: t.bg, borderRadius: 4, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 4, backgroundColor: t.accent },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#16241F', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22 },
-  sheetTitle: { color: '#F4EFE6', fontSize: 16, marginBottom: 16 },
-  textField: { backgroundColor: '#1D2E27', borderRadius: 12, color: '#F4EFE6', padding: 12, fontSize: 14.5, marginBottom: 12 },
-  dateBtn: { backgroundColor: '#1D2E27', borderRadius: 12, padding: 12, marginBottom: 16 },
-  saveBtn: { backgroundColor: '#E8B84B', padding: 14, borderRadius: 14, alignItems: 'center' },
+  sheet: { backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22 },
+  sheetTitle: { color: t.ink, fontSize: 16, marginBottom: 16 },
+  textField: { backgroundColor: t.surface2, borderRadius: 12, color: t.ink, padding: 12, fontSize: 14.5, marginBottom: 12 },
+  dateBtn: { backgroundColor: t.surface2, borderRadius: 12, padding: 12, marginBottom: 16 },
+  saveBtn: { backgroundColor: t.accent, padding: 14, borderRadius: 14, alignItems: 'center' },
+  saveText: { color: t.onAccent, fontWeight: '600' },
+  cancel: { color: t.inkDim, textAlign: 'center', marginTop: 12 },
 });
