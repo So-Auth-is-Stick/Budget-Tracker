@@ -20,6 +20,12 @@ export default function BudgetScreen({ categories, setCategories, transactions }
 
   const totalMonthlyBudget = expenseCats.reduce((s, c) => s + (c.budget || 0), 0);
   const totalMonthlySpent = expenseCats.reduce((s, c) => s + spentThisMonth(c.id), 0);
+  const lastMonth = prevMonthOf(currentMonth);
+  const totalLastMonthSpent = transactions
+    .filter((t) => t.type === 'expense' && monthOf(t.date) === lastMonth)
+    .reduce((s, t) => s + t.amount, 0);
+  const spendDiff = totalMonthlySpent - totalLastMonthSpent;
+  const pctChange = totalLastMonthSpent > 0 ? Math.round((spendDiff / totalLastMonthSpent) * 100) : null;
   const heroPct = totalMonthlyBudget > 0 ? Math.min(100, (totalMonthlySpent / totalMonthlyBudget) * 100) : 0;
   const heroOver = totalMonthlyBudget > 0 && totalMonthlySpent > totalMonthlyBudget;
 
@@ -45,6 +51,13 @@ export default function BudgetScreen({ categories, setCategories, transactions }
             ₱{totalMonthlySpent.toFixed(0)}
             {totalMonthlyBudget > 0 && <Text style={styles.heroOf}>  of ₱{totalMonthlyBudget.toFixed(0)} budgeted</Text>}
           </Text>
+          {totalLastMonthSpent > 0 && (
+            <View style={styles.compareRow}>
+              <Text style={[styles.compareText, { color: spendDiff > 0 ? '#D97A55' : spendDiff < 0 ? '#7FC29B' : '#9FB0A8' }]}>
+                {spendDiff > 0 ? '▲' : spendDiff < 0 ? '▼' : '—'} {Math.abs(pctChange)}% {spendDiff > 0 ? 'more' : spendDiff < 0 ? 'less' : 'the same as'} last month
+              </Text>
+            </View>
+          )}
           {totalMonthlyBudget > 0 && (
             <View style={styles.heroTrack}>
               <View style={[styles.heroFill, { width: `${heroPct}%`, backgroundColor: heroOver ? '#D97A55' : '#E8B84B' }]} />
@@ -120,6 +133,8 @@ export default function BudgetScreen({ categories, setCategories, transactions }
 }
 
 const styles = StyleSheet.create({
+  compareRow: { marginTop: 10 },
+  compareText: { fontSize: 12.5, fontWeight: '600' },
   container: { flex: 1, backgroundColor: '#0F1A18', paddingTop: 60 },
   heroCard: { backgroundColor: '#1D2E27', borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 24 },
   heroLabel: { color: '#9FB0A8', fontSize: 13, marginBottom: 6 },
