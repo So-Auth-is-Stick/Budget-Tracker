@@ -4,10 +4,12 @@ import PinScreen from './components/PinScreen';
 import FeedScreen from './components/FeedScreen';
 import CalendarScreen from './components/CalendarScreen';
 import BudgetScreen from './components/BudgetScreen';
-import SavingsScreen from './components/SavingsScreen';
+import PlannerScreen from './components/PlannerScreen';
 import { loadCategories } from './components/categories';
-import { loadTransactions } from './components/storage';
+import { loadTransactions, addTransactions } from './components/storage';
 import { loadGoals } from './components/goals';
+import { loadRecurring, saveRecurring } from './components/recurring';
+import { processRecurring } from './components/recurringEngine';
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(false);
@@ -15,11 +17,28 @@ export default function App() {
   const [categories, setCategories] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [recurringRules, setRecurringRules] = useState([]);
 
   useEffect(() => {
-    loadCategories().then(setCategories);
-    loadTransactions().then(setTransactions);
-    loadGoals().then(setGoals);
+    async function init() {
+      const [cats, txs, gls, rules] = await Promise.all([
+        loadCategories(), loadTransactions(), loadGoals(), loadRecurring(),
+      ]);
+      setCategories(cats);
+      setGoals(gls);
+
+      const { newTx, updatedRules } = processRecurring(rules);
+      if (newTx.length > 0) {
+        const merged = await addTransactions(newTx);
+        setTransactions(merged);
+        await saveRecurring(updatedRules);
+        setRecurringRules(updatedRules);
+      } else {
+        setTransactions(txs);
+        setRecurringRules(rules);
+      }
+    }
+    init();
   }, []);
 
   if (!unlocked) return <PinScreen onUnlock={() => setUnlocked(true)} />;
@@ -31,9 +50,11 @@ export default function App() {
         <FeedScreen categories={categories} setCategories={setCategories} transactions={transactions} setTransactions={setTransactions} goals={goals} />
       )}
       {tab === 'cal' && (
-        <CalendarScreen categories={categories} transactions={transactions} setTransactions={setTransactions} goals={goals} />
+        <CalendarScreen categories={categories} transactions={transactions} setTransactions={setTransactions} goals={goals} setGoals={setGoals} />
       )}
-      {tab === 'savings' && <SavingsScreen goals={goals} setGoals={setGoals} />}
+      {tab === 'planner' && (
+        <PlannerScreen categories={categories} goals={goals} setGoals={setGoals} recurringRules={recurringRules} setRecurringRules={setRecurringRules} />
+      )}
 
       <View style={styles.tabBar}>
         <TouchableOpacity onPress={() => setTab('budget')} style={styles.tabBtn}>
@@ -45,8 +66,8 @@ export default function App() {
         <TouchableOpacity onPress={() => setTab('cal')} style={styles.tabBtn}>
           <Text style={{ color: tab === 'cal' ? '#E8B84B' : '#9FB0A8' }}>Calendar</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setTab('savings')} style={styles.tabBtn}>
-          <Text style={{ color: tab === 'savings' ? '#E8B84B' : '#9FB0A8' }}>Savings</Text>
+        <TouchableOpacity onPress={() => setTab('planner')} style={styles.tabBtn}>
+          <Text style={{ color: tab === 'planner' ? '#E8B84B' : '#9FB0A8' }}>Planner</Text>
         </TouchableOpacity>
       </View>
     </View>
