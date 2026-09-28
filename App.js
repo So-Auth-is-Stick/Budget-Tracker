@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import PinScreen from './components/PinScreen';
 import FeedScreen from './components/FeedScreen';
 import CalendarScreen from './components/CalendarScreen';
 import BudgetScreen from './components/BudgetScreen';
 import PlannerScreen from './components/PlannerScreen';
+import { ThemeProvider, useTheme } from './components/theme';
 import { loadCategories } from './components/categories';
 import { loadTransactions, addTransactions } from './components/storage';
 import { loadGoals } from './components/goals';
 import { loadRecurring, saveRecurring } from './components/recurring';
 import { processRecurring } from './components/recurringEngine';
 
-export default function App() {
+function Main() {
+  const { theme: t } = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const [unlocked, setUnlocked] = useState(false);
   const [tab, setTab] = useState('main');
   const [categories, setCategories] = useState([]);
@@ -26,11 +30,9 @@ export default function App() {
       ]);
       setCategories(cats);
       setGoals(gls);
-
       const { newTx, updatedRules } = processRecurring(rules);
       if (newTx.length > 0) {
-        const merged = await addTransactions(newTx);
-        setTransactions(merged);
+        setTransactions(await addTransactions(newTx));
         await saveRecurring(updatedRules);
         setRecurringRules(updatedRules);
       } else {
@@ -41,10 +43,17 @@ export default function App() {
     init();
   }, []);
 
-  if (!unlocked) return <PinScreen onUnlock={() => setUnlocked(true)} />;
+  const statusBar = <StatusBar style={t.isDark ? 'light' : 'dark'} />;
+
+  if (!unlocked) {
+    return (<>{statusBar}<PinScreen onUnlock={() => setUnlocked(true)} /></>);
+  }
+
+  const tabs = [['budget', 'Budget'], ['main', 'Balance'], ['cal', 'Calendar'], ['planner', 'Planner']];
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0F1A18' }}>
+    <View style={styles.root}>
+      {statusBar}
       {tab === 'budget' && <BudgetScreen categories={categories} setCategories={setCategories} transactions={transactions} />}
       {tab === 'main' && (
         <FeedScreen categories={categories} setCategories={setCategories} transactions={transactions} setTransactions={setTransactions} goals={goals} />
@@ -55,26 +64,27 @@ export default function App() {
       {tab === 'planner' && (
         <PlannerScreen categories={categories} goals={goals} setGoals={setGoals} recurringRules={recurringRules} setRecurringRules={setRecurringRules} />
       )}
-
       <View style={styles.tabBar}>
-        <TouchableOpacity onPress={() => setTab('budget')} style={styles.tabBtn}>
-          <Text style={{ color: tab === 'budget' ? '#E8B84B' : '#9FB0A8' }}>Budget</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setTab('main')} style={styles.tabBtn}>
-          <Text style={{ color: tab === 'main' ? '#E8B84B' : '#9FB0A8' }}>Balance</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setTab('cal')} style={styles.tabBtn}>
-          <Text style={{ color: tab === 'cal' ? '#E8B84B' : '#9FB0A8' }}>Calendar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setTab('planner')} style={styles.tabBtn}>
-          <Text style={{ color: tab === 'planner' ? '#E8B84B' : '#9FB0A8' }}>Planner</Text>
-        </TouchableOpacity>
+        {tabs.map(([key, label]) => (
+          <TouchableOpacity key={key} onPress={() => setTab(key)} style={styles.tabBtn}>
+            <Text style={{ color: tab === key ? t.accent : t.inkDim }}>{label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  tabBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: '#16241F', paddingBottom: 24, paddingTop: 12, borderTopColor: '#2A3B34', borderTopWidth: 1 },
+export default function App() {
+  return (
+    <ThemeProvider>
+      <Main />
+    </ThemeProvider>
+  );
+}
+
+const makeStyles = (t) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: t.bg },
+  tabBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: t.surface, paddingBottom: 24, paddingTop: 12, borderTopColor: t.edge, borderTopWidth: 1 },
   tabBtn: { flex: 1, alignItems: 'center' },
 });
