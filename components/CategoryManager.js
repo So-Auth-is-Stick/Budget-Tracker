@@ -1,84 +1,75 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
-import { addCategory, updateCategory, deleteCategory, COLOR_PALETTE } from './categories';
+import { addCategory, updateCategory, deleteCategory } from './categories';
+import ColorPicker, { COLOR_CHOICES } from './ColorPicker';
+import { useTheme } from './theme';
 
 export default function CategoryManager({ categories, setCategories }) {
+  const { theme: t } = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const [manageType, setManageType] = useState('expense');
   const [newLabel, setNewLabel] = useState('');
   const [newIcon, setNewIcon] = useState('');
-  const [newColor, setNewColor] = useState(COLOR_PALETTE[0]);
+  const [newColor, setNewColor] = useState(COLOR_CHOICES[0]);
 
   const shown = categories.filter((c) => c.type === manageType);
 
-  const handlePickColor = async (id, color) => {
-    setCategories(await updateCategory(id, { color }));
-  };
-  const handleDelete = async (id) => {
-    setCategories(await deleteCategory(id));
-  };
+  const handlePickColor = async (id, color) => setCategories(await updateCategory(id, { color }));
+  const handleDelete = async (id) => setCategories(await deleteCategory(id));
   const handleAdd = async () => {
     if (!newLabel.trim()) return;
     const id = newLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now();
-    setCategories(await addCategory({
-      id, label: newLabel.trim(), icon: newIcon.trim() || '◦', color: newColor, type: manageType,
-    }));
+    setCategories(await addCategory({ id, label: newLabel.trim(), icon: newIcon.trim() || '◦', color: newColor, type: manageType }));
     setNewLabel('');
     setNewIcon('');
   };
 
   return (
-    <View style={{ maxHeight: 460 }}>
+    <View>
       <View style={styles.typeRow}>
         <TouchableOpacity style={[styles.typeBtn, manageType === 'expense' && styles.typeBtnActive]} onPress={() => setManageType('expense')}>
-          <Text style={{ color: '#F4EFE6' }}>Spent tags</Text>
+          <Text style={styles.typeText}>Spent tags</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.typeBtn, manageType === 'income' && styles.typeBtnActive]} onPress={() => setManageType('income')}>
-          <Text style={{ color: '#F4EFE6' }}>Earned tags</Text>
+          <Text style={styles.typeText}>Earned tags</Text>
         </TouchableOpacity>
       </View>
-      <ScrollView style={{ maxHeight: 240 }}>
+
+      <ScrollView style={{ maxHeight: 260 }} keyboardShouldPersistTaps="handled">
         {shown.map((c) => (
           <View key={c.id} style={styles.catRow}>
             <View style={[styles.swatch, { backgroundColor: c.color + '33' }]}><Text>{c.icon}</Text></View>
-            <Text style={styles.catName}>{c.label}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-              {COLOR_PALETTE.map((color) => (
-                <TouchableOpacity key={color} onPress={() => handlePickColor(c.id, color)}
-                  style={[styles.dot, { backgroundColor: color }, c.color === color && styles.dotSelected]} />
-              ))}
-            </ScrollView>
-            <TouchableOpacity onPress={() => handleDelete(c.id)}>
-              <Text style={{ color: '#5E6F68', fontSize: 16, paddingLeft: 8 }}>✕</Text>
+            <Text style={styles.catName} numberOfLines={1}>{c.label}</Text>
+            <ColorPicker value={c.color} onChange={(color) => handlePickColor(c.id, color)} />
+            <TouchableOpacity onPress={() => handleDelete(c.id)} hitSlop={8}>
+              <Text style={styles.del}>✕</Text>
             </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
+
       <View style={styles.addRow}>
-        <TextInput style={styles.iconInput} placeholder="🙂" placeholderTextColor="#5E6F68" value={newIcon} onChangeText={setNewIcon} />
-        <TextInput style={styles.labelInput} placeholder="New tag name" placeholderTextColor="#5E6F68" value={newLabel} onChangeText={setNewLabel} />
-        <TouchableOpacity onPress={handleAdd} style={styles.addBtn}><Text style={{ color: '#1B1200', fontWeight: '600' }}>Add</Text></TouchableOpacity>
+        <TextInput style={styles.iconInput} placeholder="🙂" placeholderTextColor={t.inkFaint} value={newIcon} onChangeText={setNewIcon} />
+        <TextInput style={styles.labelInput} placeholder="New tag name" placeholderTextColor={t.inkFaint} value={newLabel} onChangeText={setNewLabel} />
+        <ColorPicker value={newColor} onChange={setNewColor} />
+        <TouchableOpacity onPress={handleAdd} style={styles.addBtn}><Text style={styles.addText}>Add</Text></TouchableOpacity>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-        {COLOR_PALETTE.map((color) => (
-          <TouchableOpacity key={color} onPress={() => setNewColor(color)}
-            style={[styles.dot, { backgroundColor: color }, newColor === color && styles.dotSelected]} />
-        ))}
-      </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => StyleSheet.create({
   typeRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  typeBtn: { flex: 1, padding: 8, borderRadius: 10, backgroundColor: '#1D2E27', alignItems: 'center' },
-  typeBtnActive: { backgroundColor: '#2A3B34' },
-  catRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomColor: '#2A3B34', borderBottomWidth: 1 },
-  swatch: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
-  catName: { color: '#F4EFE6', width: 70, fontSize: 13 },
-  dot: { width: 22, height: 22, borderRadius: 11, marginRight: 6, borderWidth: 2, borderColor: 'transparent' },
-  dotSelected: { borderColor: '#F4EFE6' },
-  addRow: { flexDirection: 'row', gap: 8, marginTop: 14, alignItems: 'center' },
-  iconInput: { width: 44, backgroundColor: '#1D2E27', borderRadius: 10, color: '#F4EFE6', textAlign: 'center', padding: 8 },
-  labelInput: { flex: 1, backgroundColor: '#1D2E27', borderRadius: 10, color: '#F4EFE6', padding: 8 },
-  addBtn: { backgroundColor: '#E8B84B', paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center' },
+  typeBtn: { flex: 1, padding: 9, borderRadius: 10, backgroundColor: t.surface2, alignItems: 'center' },
+  typeBtnActive: { backgroundColor: t.edge },
+  typeText: { color: t.ink },
+  catRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomColor: t.edge, borderBottomWidth: 1 },
+  swatch: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  catName: { color: t.ink, fontSize: 14, flex: 1 },
+  del: { color: t.inkFaint, fontSize: 16, paddingLeft: 4 },
+  addRow: { flexDirection: 'row', gap: 8, marginTop: 16, alignItems: 'center' },
+  iconInput: { width: 44, backgroundColor: t.surface2, borderRadius: 10, color: t.ink, textAlign: 'center', padding: 8 },
+  labelInput: { flex: 1, backgroundColor: t.surface2, borderRadius: 10, color: t.ink, padding: 8 },
+  addBtn: { backgroundColor: t.accent, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center', height: 36 },
+  addText: { color: t.onAccent, fontWeight: '600' },
 });

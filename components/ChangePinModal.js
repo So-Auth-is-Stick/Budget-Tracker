@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { useTheme } from './theme';
 
 export default function ChangePinModal({ visible, onClose }) {
+  const { theme: t } = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -11,18 +14,9 @@ export default function ChangePinModal({ visible, onClose }) {
 
   const handleSave = async () => {
     const savedPin = await SecureStore.getItemAsync('ledger_pin');
-    if (currentPin !== savedPin) {
-      Alert.alert('Incorrect PIN', 'Your current PIN is wrong.');
-      return;
-    }
-    if (newPin.length !== 4 || confirmPin.length !== 4) {
-      Alert.alert('Invalid PIN', 'New PIN must be exactly 4 digits.');
-      return;
-    }
-    if (newPin !== confirmPin) {
-      Alert.alert("Didn't match", 'New PIN and confirmation must match.');
-      return;
-    }
+    if (currentPin !== savedPin) { Alert.alert('Incorrect PIN', 'Your current PIN is wrong.'); return; }
+    if (newPin.length !== 4 || confirmPin.length !== 4) { Alert.alert('Invalid PIN', 'New PIN must be exactly 4 digits.'); return; }
+    if (newPin !== confirmPin) { Alert.alert("Didn't match", 'New PIN and confirmation must match.'); return; }
     await SecureStore.setItemAsync('ledger_pin', newPin);
     Alert.alert('PIN updated', 'Your PIN has been changed.');
     reset();
@@ -30,25 +24,27 @@ export default function ChangePinModal({ visible, onClose }) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <Text style={styles.title}>Change PIN</Text>
-          <TextInput style={styles.input} placeholder="Current PIN" placeholderTextColor="#5E6F68" keyboardType="number-pad" maxLength={4} secureTextEntry value={currentPin} onChangeText={setCurrentPin} />
-          <TextInput style={styles.input} placeholder="New PIN" placeholderTextColor="#5E6F68" keyboardType="number-pad" maxLength={4} secureTextEntry value={newPin} onChangeText={setNewPin} />
-          <TextInput style={styles.input} placeholder="Confirm new PIN" placeholderTextColor="#5E6F68" keyboardType="number-pad" maxLength={4} secureTextEntry value={confirmPin} onChangeText={setConfirmPin} />
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}><Text style={{ color: '#1B1200', fontWeight: '600' }}>Save</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => { reset(); onClose(); }}><Text style={{ color: '#9FB0A8', textAlign: 'center', marginTop: 12 }}>Cancel</Text></TouchableOpacity>
+          <TextInput style={styles.input} placeholder="Current PIN" placeholderTextColor={t.inkFaint} keyboardType="number-pad" maxLength={4} secureTextEntry value={currentPin} onChangeText={setCurrentPin} />
+          <TextInput style={styles.input} placeholder="New PIN" placeholderTextColor={t.inkFaint} keyboardType="number-pad" maxLength={4} secureTextEntry value={newPin} onChangeText={setNewPin} />
+          <TextInput style={styles.input} placeholder="Confirm new PIN" placeholderTextColor={t.inkFaint} keyboardType="number-pad" maxLength={4} secureTextEntry value={confirmPin} onChangeText={setConfirmPin} />
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => { reset(); onClose(); }}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
         </View>
       </View>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#16241F', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22 },
-  title: { color: '#F4EFE6', fontSize: 17, marginBottom: 16 },
-  input: { backgroundColor: '#1D2E27', borderRadius: 12, color: '#F4EFE6', padding: 12, fontSize: 16, marginBottom: 12, textAlign: 'center', letterSpacing: 4 },
-  saveBtn: { backgroundColor: '#E8B84B', padding: 14, borderRadius: 14, alignItems: 'center', marginTop: 6 },
+  sheet: { backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22 },
+  title: { color: t.ink, fontSize: 17, marginBottom: 16 },
+  input: { backgroundColor: t.surface2, borderRadius: 12, color: t.ink, padding: 12, fontSize: 16, marginBottom: 12, textAlign: 'center', letterSpacing: 4 },
+  saveBtn: { backgroundColor: t.accent, padding: 14, borderRadius: 14, alignItems: 'center', marginTop: 6 },
+  saveText: { color: t.onAccent, fontWeight: '600' },
+  cancel: { color: t.inkDim, textAlign: 'center', marginTop: 12 },
 });
