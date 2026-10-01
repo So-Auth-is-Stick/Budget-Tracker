@@ -12,6 +12,7 @@ import { loadTransactions, addTransactions } from './components/storage';
 import { loadGoals } from './components/goals';
 import { loadRecurring, saveRecurring } from './components/recurring';
 import { processRecurring } from './components/recurringEngine';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 function Main() {
   const { theme: t } = useTheme();
@@ -78,7 +79,9 @@ function Main() {
 export default function App() {
   return (
     <ThemeProvider>
-      <Main />
+      <SafeAreaProvider>
+        <Main />
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }
