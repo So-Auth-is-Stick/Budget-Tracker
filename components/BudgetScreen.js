@@ -126,7 +126,7 @@ export default function BudgetScreen({ categories, setCategories, transactions }
 }
 
 const makeStyles = (t) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: t.bg },
+  container: { flex: 1, backgroundColor: t.bg, paddingTop: 12 },
   heroCard: { backgroundColor: t.surface2, borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 24 },
   heroLabel: { color: t.inkDim, fontSize: 13, marginBottom: 6 },
   heroAmt: { color: t.ink, fontSize: 30, fontWeight: '700', marginBottom: 12 },
