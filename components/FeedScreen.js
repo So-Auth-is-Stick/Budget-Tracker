@@ -8,10 +8,12 @@ import SettingsModal from './SettingsModal';
 import { findCategory } from './categories';
 import { todayStr } from './dateUtils';
 import { useTheme, readableOn } from './theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FeedScreen({ categories, setCategories, transactions, setTransactions, goals }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
+  const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -48,7 +50,7 @@ export default function FeedScreen({ categories, setCategories, transactions, se
   const openAddSheet = () => { setType('expense'); setSelectedCategoryId(null); setModalVisible(true); };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.topRow}>
         <View>
           <Text style={styles.label}>Balance</Text>
@@ -140,7 +142,7 @@ export default function FeedScreen({ categories, setCategories, transactions, se
 }
 
 const makeStyles = (t) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: t.bg, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: t.bg },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, marginBottom: 16 },
   iconCol: { flexDirection: 'row', gap: 16, paddingTop: 8 },
   label: { color: t.inkDim, fontSize: 13 },

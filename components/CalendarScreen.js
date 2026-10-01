@@ -9,12 +9,14 @@ import { updateGoal, deleteGoal } from './goals';
 import { findCategory } from './categories';
 import { todayStr, getWeekRange, monthOf, daysUntil } from './dateUtils';
 import { useTheme } from './theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const GOAL_DOT = '#9C6ADE';
 
 export default function CalendarScreen({ categories, transactions, setTransactions, goals, setGoals }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
+  const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
   const [detailGoal, setDetailGoal] = useState(null);
@@ -103,7 +105,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <Calendar
         key={t.name}
         markingType="multi-dot"
@@ -185,7 +187,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
 }
 
 const makeStyles = (t) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: t.bg, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: t.bg },
   weekStat: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 18 },
   weekStatLabel: { color: t.inkDim, fontSize: 13 },
   weekStatValue: { color: t.spend, fontSize: 15, fontWeight: '600' },

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function BudgetScreen({ categories, setCategories, transactions }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
+  const insets = useSafeAreaInsets();
   const [limitModalCat, setLimitModalCat] = useState(null);
   const [dailyInput, setDailyInput] = useState('');
   const [monthlyInput, setMonthlyInput] = useState('');
@@ -47,7 +48,7 @@ export default function BudgetScreen({ categories, setCategories, transactions }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 160 }}>
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Spent this month</Text>
@@ -125,7 +126,7 @@ export default function BudgetScreen({ categories, setCategories, transactions }
 }
 
 const makeStyles = (t) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: t.bg, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: t.bg },
   heroCard: { backgroundColor: t.surface2, borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 24 },
   heroLabel: { color: t.inkDim, fontSize: 13, marginBottom: 6 },
   heroAmt: { color: t.ink, fontSize: 30, fontWeight: '700', marginBottom: 12 },

@@ -6,10 +6,12 @@ import GoalDetailModal from './GoalDetailModal';
 import RecurringManager from './RecurringManager';
 import { daysUntil } from './dateUtils';
 import { useTheme } from './theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PlannerScreen({ categories, goals, setGoals, recurringRules, setRecurringRules }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
+  const insets = useSafeAreaInsets();
   const [addVisible, setAddVisible] = useState(false);
   const [label, setLabel] = useState('');
   const [target, setTarget] = useState('');
@@ -37,7 +39,7 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
   const handleDelete = async (id) => setGoals(await deleteGoal(id));
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.heroCard}>
         <Text style={styles.heroLabel}>Total saved</Text>
         <Text style={styles.heroAmt}>₱{totalSaved.toFixed(2)}</Text>
@@ -97,7 +99,7 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
 }
 
 const makeStyles = (t) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: t.bg, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: t.bg },
   heroCard: { backgroundColor: t.surface2, borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 20 },
   heroLabel: { color: t.inkDim, fontSize: 13, marginBottom: 6 },
   heroAmt: { color: t.accent, fontSize: 30, fontWeight: '700' },
