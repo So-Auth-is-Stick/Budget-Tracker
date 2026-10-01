@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal 
 import { updateCategory } from './categories';
 import { todayStr, monthOf, prevMonthOf } from './dateUtils';
 import { useTheme } from './theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function BudgetScreen({ categories, setCategories, transactions }) {
   const { theme: t } = useTheme();
