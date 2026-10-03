@@ -86,3 +86,5 @@ Ledger/
 All data (transactions, tags, budgets, goals, recurring rules) is stored locally on-device using AsyncStorage. The PIN is stored separately in encrypted secure storage. Nothing leaves the device — there is no backend, account system, or analytics.
 
 ## License
+
+MIT License.
