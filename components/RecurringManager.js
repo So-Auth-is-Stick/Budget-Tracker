@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal, Alert, Switch } from 'react-native';
 import { addRecurring, updateRecurring, deleteRecurring } from './recurring';
 import { findCategory } from './categories';
+import { sortByRecent } from './sortUtils';
 import { useTheme, readableOn } from './theme';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -62,7 +63,7 @@ export default function RecurringManager({ categories, rules, setRules }) {
         <TouchableOpacity onPress={openAdd}><Text style={styles.addLink}>+ Add</Text></TouchableOpacity>
       </View>
       {rules.length === 0 && <Text style={styles.empty}>No recurring transactions yet.</Text>}
-      {rules.map((rule) => {
+      {sortByRecent(rules).map((rule) => {
         const cat = findCategory(categories, rule.category);
         const sign = rule.type === 'income' ? '+' : '−';
         const color = rule.type === 'income' ? t.gain : t.spend;
