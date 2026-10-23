@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useTheme } from './theme';
 
-export default function DatePickerModal({ visible, initialDate, onConfirm, onClose }) {
+export default function DatePickerModal({ visible, initialDate, maxDate, onConfirm, onClose }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const [picked, setPicked] = useState(initialDate || null);
@@ -18,6 +18,7 @@ export default function DatePickerModal({ visible, initialDate, onConfirm, onClo
           <Calendar
             key={t.name}
             current={initialDate || undefined}
+            maxDate={maxDate}
             onDayPress={(day) => setPicked(day.dateString)}
             markedDates={picked ? { [picked]: { selected: true, selectedColor: t.accent } } : {}}
             theme={{
