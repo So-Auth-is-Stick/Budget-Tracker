@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { findCategory } from './categories';
+import { formatLong } from './dateUtils';
 import { useTheme } from './theme';
 
-export default function TransactionRow({ item, categories, onPress }) {
+export default function TransactionRow({ item, categories, onPress, showDate, warnings }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const cat = findCategory(categories, item.category);
@@ -16,6 +17,10 @@ export default function TransactionRow({ item, categories, onPress }) {
       <View style={styles.left}>
         <Text style={styles.tag} numberOfLines={1}>{cat.icon} {cat.label}</Text>
         {!!item.note && <Text style={styles.note} numberOfLines={1} ellipsizeMode="tail">{item.note}</Text>}
+        {showDate && <Text style={styles.date}>{formatLong(item.date)}</Text>}
+        {!!warnings && warnings.length > 0 && (
+          <Text style={styles.warn}>⚠️ Over {warnings.join(' + ')} limit</Text>
+        )}
       </View>
       <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>{sign}₱{item.amount.toFixed(2)}</Text>
     </TouchableOpacity>
@@ -28,5 +33,7 @@ const makeStyles = (t) => StyleSheet.create({
   left: { flex: 1, marginRight: 12 },
   tag: { color: t.ink, fontSize: 14.5 },
   note: { color: t.inkFaint, fontSize: 12.5, marginTop: 3 },
+  date: { color: t.inkFaint, fontSize: 11.5, marginTop: 3 },
+  warn: { color: t.spend, fontSize: 11.5, marginTop: 3, fontWeight: '600' },
   amount: { fontSize: 16, fontWeight: '600', flexShrink: 0 },
 });
