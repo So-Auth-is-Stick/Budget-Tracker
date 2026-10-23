@@ -1,68 +1,56 @@
 import { useState, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deleteTransaction, updateTransaction } from './storage';
 import TransactionRow from './TransactionRow';
 import TransactionDetailModal from './TransactionDetailModal';
 import GoalDetailModal from './GoalDetailModal';
 import { updateGoal, deleteGoal } from './goals';
 import { findCategory } from './categories';
-import { todayStr, getWeekRange, monthOf, daysUntil } from './dateUtils';
+import { computeOverLimitFlags, periodSpent, limitFor } from './overLimit';
+import { getWeekRange, monthOf, daysUntil } from './dateUtils';
+import { useToday } from './useToday';
 import { useTheme } from './theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const GOAL_DOT = '#9C6ADE';
 
-export default function CalendarScreen({ categories, transactions, setTransactions, goals, setGoals }) {
+export default function CalendarScreen({ categories, transactions, setTransactions, goals, setGoals, onCommitGoal }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
+  const today = useToday();
   const [selectedDate, setSelectedDate] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
   const [detailGoal, setDetailGoal] = useState(null);
   const [searchText, setSearchText] = useState('');
 
-  const refDate = selectedDate || todayStr();
-  const { start, end } = getWeekRange(refDate);
-  const weeklySpend = transactions.filter((tx) => tx.type === 'expense' && tx.date >= start && tx.date <= end).reduce((s, tx) => s + tx.amount, 0);
-  const dailySpend = selectedDate
-    ? transactions.filter((tx) => tx.type === 'expense' && tx.date === selectedDate).reduce((s, tx) => s + tx.amount, 0)
-    : 0;
+  // Which expenses pushed a tag past its daily / weekly / monthly limit
+  const flags = useMemo(() => computeOverLimitFlags(transactions, categories), [transactions, categories]);
 
-  const summaryByDate = transactions.reduce((acc, tx) => {
-    if (!acc[tx.date]) acc[tx.date] = { income: false, expense: false };
-    acc[tx.date][tx.type] = true;
-    return acc;
-  }, {});
+  const { start, end } = getWeekRange(selectedDate || today);
+  const expenses = transactions.filter((tx) => tx.type === 'expense');
+  const weeklySpend = expenses.filter((tx) => tx.date >= start && tx.date <= end).reduce((s, tx) => s + tx.amount, 0);
+  const dailySpend = selectedDate ? expenses.filter((tx) => tx.date === selectedDate).reduce((s, tx) => s + tx.amount, 0) : 0;
 
+  const summaryByDate = {};
+  transactions.forEach((tx) => {
+    const day = (summaryByDate[tx.date] = summaryByDate[tx.date] || { income: false, expense: false });
+    day[tx.type] = true;
+  });
   const overLimitDates = {};
-  const dailyLimited = categories.filter((c) => c.type === 'expense' && c.dailyBudget > 0);
-  if (dailyLimited.length) {
-    const byDateCat = {};
-    transactions.forEach((tx) => {
-      if (tx.type !== 'expense') return;
-      const key = tx.date + '|' + tx.category;
-      byDateCat[key] = (byDateCat[key] || 0) + tx.amount;
-    });
-    dailyLimited.forEach((c) => {
-      Object.keys(byDateCat).forEach((key) => {
-        const [date, catId] = key.split('|');
-        if (catId === c.id && byDateCat[key] > c.dailyBudget) overLimitDates[date] = true;
-      });
-    });
-  }
+  transactions.forEach((tx) => { if (flags[tx.id]) overLimitDates[tx.date] = true; });
 
   const goalsDueByDate = {};
-  (goals || []).forEach((g) => {
-    if (g.dueDate) (goalsDueByDate[g.dueDate] = goalsDueByDate[g.dueDate] || []).push(g);
+  (goals || []).filter((g) => !g.committed && g.dueDate).forEach((g) => {
+    (goalsDueByDate[g.dueDate] = goalsDueByDate[g.dueDate] || []).push(g);
   });
 
-  const allDates = new Set([...Object.keys(summaryByDate), ...Object.keys(goalsDueByDate)]);
   const marked = {};
-  allDates.forEach((date) => {
+  new Set([...Object.keys(summaryByDate), ...Object.keys(goalsDueByDate)]).forEach((date) => {
     const dots = [];
-    if (summaryByDate[date]?.income) dots.push({ key: 'in', color: t.gain });
-    if (summaryByDate[date]?.expense) dots.push({ key: 'out', color: t.spend });
+    if (summaryByDate[date] && summaryByDate[date].income) dots.push({ key: 'in', color: t.gain });
+    if (summaryByDate[date] && summaryByDate[date].expense) dots.push({ key: 'out', color: t.spend });
     if (overLimitDates[date]) dots.push({ key: 'warn', color: t.accent });
     if (goalsDueByDate[date]) dots.push({ key: 'goal', color: GOAL_DOT });
     marked[date] = { dots, marked: true };
@@ -71,20 +59,38 @@ export default function CalendarScreen({ categories, transactions, setTransactio
     marked[selectedDate] = { ...(marked[selectedDate] || {}), selected: true, selectedColor: t.accent };
   }
 
-  const currentMonth = monthOf(todayStr());
+  const currentMonth = monthOf(today);
   const monthByCat = {};
-  transactions.filter((tx) => tx.type === 'expense' && monthOf(tx.date) === currentMonth)
-    .forEach((tx) => { monthByCat[tx.category] = (monthByCat[tx.category] || 0) + tx.amount; });
+  expenses.filter((tx) => monthOf(tx.date) === currentMonth).forEach((tx) => {
+    monthByCat[tx.category] = (monthByCat[tx.category] || 0) + tx.amount;
+  });
   const monthEntries = Object.entries(monthByCat).sort((a, b) => b[1] - a[1]);
   const monthMax = monthEntries.length ? monthEntries[0][1] : 0;
 
-  const dayTransactions = selectedDate ? [...transactions.filter((tx) => tx.date === selectedDate)].reverse() : [];
-  const filteredDayTransactions = dayTransactions.filter((tx) => {
+  const dayTransactions = selectedDate
+    ? transactions.filter((tx) => tx.date === selectedDate).sort((a, b) => b.id - a.id)
+    : [];
+  const q = searchText.trim().toLowerCase();
+  const shownTransactions = dayTransactions.filter((tx) => {
     const cat = findCategory(categories, tx.category);
-    const q = searchText.trim().toLowerCase();
     return !q || (tx.note || '').toLowerCase().includes(q) || cat.label.toLowerCase().includes(q);
   });
-  const dayGoals = selectedDate ? (goalsDueByDate[selectedDate] || []) : [];
+  const dayGoals = selectedDate ? goalsDueByDate[selectedDate] || [] : [];
+
+  // One line per tag + limit type that was broken on the selected day
+  const dayAlerts = [];
+  if (selectedDate) {
+    const seen = {};
+    dayTransactions.forEach((tx) => {
+      (flags[tx.id] || []).forEach((kind) => {
+        const key = tx.category + '|' + kind;
+        if (seen[key]) return;
+        seen[key] = true;
+        const cat = findCategory(categories, tx.category);
+        dayAlerts.push({ key, cat, kind, limit: limitFor(cat, kind), spent: periodSpent(transactions, tx.category, kind, selectedDate) });
+      });
+    });
+  }
 
   const handleDelete = async (id) => setTransactions(await deleteTransaction(id));
   const handleEditSave = async (id, changes) => setTransactions(await updateTransaction(id, changes));
@@ -98,12 +104,6 @@ export default function CalendarScreen({ categories, transactions, setTransactio
   const handleGoalDelete = async (id) => setGoals(await deleteGoal(id));
   const closeDaySheet = () => { setSelectedDate(null); setSearchText(''); };
 
-  const calTheme = {
-    calendarBackground: t.bg, dayTextColor: t.ink, monthTextColor: t.ink, textDisabledColor: t.inkFaint,
-    todayTextColor: t.accent, arrowColor: t.accent, textSectionTitleColor: t.inkDim,
-    selectedDayBackgroundColor: t.accent, selectedDayTextColor: t.onAccent,
-  };
-
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <Calendar
@@ -111,11 +111,15 @@ export default function CalendarScreen({ categories, transactions, setTransactio
         markingType="multi-dot"
         markedDates={marked}
         onDayPress={(day) => setSelectedDate(day.dateString)}
-        theme={calTheme}
+        theme={{
+          calendarBackground: t.bg, dayTextColor: t.ink, monthTextColor: t.ink, textDisabledColor: t.inkFaint,
+          todayTextColor: t.accent, arrowColor: t.accent, textSectionTitleColor: t.inkDim,
+          selectedDayBackgroundColor: t.accent, selectedDayTextColor: t.onAccent,
+        }}
         style={{ marginBottom: 10 }}
       />
       <View style={styles.weekStat}>
-        <Text style={styles.weekStatLabel}>This week ({start.slice(5)} – {end.slice(5)})</Text>
+        <Text style={styles.weekStatLabel}>This week ({start.slice(5)} to {end.slice(5)})</Text>
         <Text style={styles.weekStatValue}>₱{weeklySpend.toFixed(2)}</Text>
       </View>
 
@@ -146,39 +150,61 @@ export default function CalendarScreen({ categories, transactions, setTransactio
               <Text style={styles.dayTotal}>{overLimitDates[selectedDate] ? '⚠️ ' : ''}Spent ₱{dailySpend.toFixed(2)}</Text>
             </View>
 
-            {dayGoals.length > 0 && (
-              <View style={{ marginBottom: 14 }}>
-                <Text style={styles.upcomingLabel}>Upcoming</Text>
-                {dayGoals.map((g) => {
-                  const remaining = daysUntil(g.dueDate);
-                  return (
-                    <TouchableOpacity key={g.id} style={styles.goalRow} onPress={() => setDetailGoal(g)}>
-                      <Text style={{ color: t.ink, fontSize: 14 }}>🎯 {g.label}</Text>
-                      <Text style={[styles.goalDue, remaining < 0 && { color: t.spend }]}>
-                        {remaining < 0 ? 'Overdue' : remaining === 0 ? 'Due today' : `${remaining}d left`}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {dayAlerts.length > 0 && (
+                <View style={styles.alertBox}>
+                  <Text style={styles.alertTitle}>⚠️ Over budget</Text>
+                  {dayAlerts.map((a) => (
+                    <Text key={a.key} style={styles.alertLine}>
+                      {a.cat.icon} {a.cat.label}: ₱{a.spent.toFixed(0)} of ₱{a.limit.toFixed(0)} {a.kind} limit
+                    </Text>
+                  ))}
+                  <Text style={styles.alertHint}>Entries marked ⚠️ below are the ones that pushed it over.</Text>
+                </View>
+              )}
 
-            {dayTransactions.length > 4 && (
-              <TextInput style={styles.searchInput} placeholder="Search this day's entries" placeholderTextColor={t.inkFaint} value={searchText} onChangeText={setSearchText} />
-            )}
-            <FlatList
-              data={filteredDayTransactions}
-              keyExtractor={(item) => String(item.id)}
-              renderItem={({ item }) => <TransactionRow item={item} categories={categories} onPress={setDetailItem} />}
-              ListEmptyComponent={<Text style={styles.empty}>Nothing logged this day.</Text>}
-              style={{ maxHeight: 320 }}
-            />
+              {dayGoals.length > 0 && (
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={styles.upcomingLabel}>Upcoming</Text>
+                  {dayGoals.map((g) => {
+                    const remaining = daysUntil(g.dueDate);
+                    return (
+                      <TouchableOpacity key={g.id} style={styles.goalRow} onPress={() => setDetailGoal(g)}>
+                        <Text style={{ color: t.ink, fontSize: 14 }}>🎯 {g.label}</Text>
+                        <Text style={[styles.goalDue, remaining < 0 && { color: t.spend }]}>
+                          {remaining < 0 ? 'Overdue' : remaining === 0 ? 'Due today' : `${remaining}d left`}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {dayTransactions.length > 4 && (
+                <TextInput style={styles.searchInput} placeholder="Search this day's entries" placeholderTextColor={t.inkFaint} value={searchText} onChangeText={setSearchText} />
+              )}
+              {shownTransactions.length === 0
+                ? <Text style={styles.empty}>Nothing logged this day.</Text>
+                : shownTransactions.map((tx) => (
+                    <TransactionRow key={tx.id} item={tx} categories={categories} onPress={setDetailItem} warnings={flags[tx.id]} />
+                  ))}
+            </ScrollView>
+
             <TouchableOpacity onPress={closeDaySheet} style={{ marginTop: 16 }}>
               <Text style={{ color: t.inkDim, textAlign: 'center' }}>Close</Text>
             </TouchableOpacity>
 
             <TransactionDetailModal visible={!!detailItem} item={detailItem} categories={categories} onClose={() => setDetailItem(null)} onDelete={handleDelete} onSave={handleEditSave} />
-            <GoalDetailModal visible={!!detailGoal} goal={detailGoal} onClose={() => setDetailGoal(null)} onAdjustFunds={handleGoalAdjust} onUpdate={handleGoalUpdate} onDelete={handleGoalDelete} />
+            <GoalDetailModal
+              visible={!!detailGoal}
+              goal={detailGoal}
+              categories={categories}
+              onClose={() => setDetailGoal(null)}
+              onAdjustFunds={handleGoalAdjust}
+              onUpdate={handleGoalUpdate}
+              onDelete={handleGoalDelete}
+              onCommit={onCommitGoal}
+            />
           </View>
         </View>
       </Modal>
@@ -200,10 +226,14 @@ const makeStyles = (t) => StyleSheet.create({
   barAmt: { width: 58, textAlign: 'right', color: t.ink, fontSize: 12.5, flexShrink: 0 },
   empty: { color: t.inkFaint, fontSize: 13 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  daySheet: { backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, maxHeight: '85%' },
+  daySheet: { backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, maxHeight: '88%' },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   dayLabel: { color: t.ink, fontSize: 15, fontWeight: '600' },
   dayTotal: { color: t.spend, fontSize: 12.5, fontWeight: '600' },
+  alertBox: { backgroundColor: t.spend + '1F', borderColor: t.spend + '66', borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 14 },
+  alertTitle: { color: t.spend, fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  alertLine: { color: t.ink, fontSize: 13, marginBottom: 3 },
+  alertHint: { color: t.inkDim, fontSize: 11.5, marginTop: 4 },
   upcomingLabel: { color: GOAL_DOT, fontSize: 12, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
   goalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomColor: t.edge, borderBottomWidth: 1 },
   goalDue: { color: t.inkDim, fontSize: 12 },
