@@ -26,7 +26,6 @@ export default function FeedScreen({ categories, setCategories, transactions, se
   const sumOf = (list) => list.reduce((s, tx) => s + tx.amount, 0);
   const balance = sumOf(transactions.filter((tx) => tx.type === 'income')) - sumOf(transactions.filter((tx) => tx.type === 'expense'));
   const todays = transactions.filter((tx) => tx.date === today);
-  const earnedToday = sumOf(todays.filter((tx) => tx.type === 'income'));
   const spentToday = sumOf(todays.filter((tx) => tx.type === 'expense'));
   const totalSaved = (goals || []).filter((g) => !g.committed).reduce((s, g) => s + g.savedAmount, 0);
   const safeToSpend = balance - totalSaved;
@@ -63,10 +62,6 @@ export default function FeedScreen({ categories, setCategories, transactions, se
         </View>
       </View>
 
-      <View style={styles.statRow}>
-        <Text style={styles.statLabel}>Earned today</Text>
-        <Text style={[styles.statValue, { color: t.gain }]}>₱{earnedToday.toFixed(2)}</Text>
-      </View>
       <View style={styles.statRow}>
         <Text style={styles.statLabel}>Spent today</Text>
         <Text style={[styles.statValue, { color: t.spend }]}>₱{spentToday.toFixed(2)}</Text>

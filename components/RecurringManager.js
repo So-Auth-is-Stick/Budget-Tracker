@@ -1,15 +1,31 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal, Alert, Switch } from 'react-native';
 import { addRecurring, updateRecurring, deleteRecurring } from './recurring';
 import { findCategory } from './categories';
 import { sortByRecent } from './sortUtils';
 import { useTheme, readableOn } from './theme';
+import { useToday } from './useToday';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function RecurringManager({ categories, rules, setRules }) {
+// How far we are toward the next time this rule fires (0–100)
+function cycleProgress(rule, todayStr) {
+  const [y, m, d] = todayStr.split('-').map(Number);
+  if (rule.frequency === 'weekly') {
+    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    const daysTo = ((rule.dayOfWeek || 0) - dow + 7) % 7;
+    return ((7 - daysTo) / 7) * 100;
+  }
+  const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const due = Math.min(rule.dayOfMonth || 1, dim);
+  const daysTo = due >= d ? due - d : dim - d + due;
+  return Math.max(0, Math.min(100, ((dim - daysTo) / dim) * 100));
+}
+
+export default function RecurringManager({ categories, rules, setRules, openAddToken }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
+  const today = useToday();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [type, setType] = useState('expense');
@@ -32,6 +48,8 @@ export default function RecurringManager({ categories, rules, setRules }) {
     setModalVisible(true);
   };
 
+  useEffect(() => { if (openAddToken) openAdd(); }, [openAddToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSave = async () => {
     const value = parseFloat(amount);
     if (!value || value <= 0 || !categoryId) return;
@@ -53,40 +71,24 @@ export default function RecurringManager({ categories, rules, setRules }) {
       { text: 'Delete', style: 'destructive', onPress: async () => setRules(await deleteRecurring(rule.id)) },
     ]);
   };
-  const describe = (rule) =>
-    rule.frequency === 'monthly' ? `Every month on day ${rule.dayOfMonth}` : `Every week on ${WEEKDAYS[rule.dayOfWeek]}`;
 
   return (
     <View>
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Recurring transactions</Text>
-        <TouchableOpacity onPress={openAdd}><Text style={styles.addLink}>+ Add</Text></TouchableOpacity>
-      </View>
+      <Text style={styles.sectionTitle}>Recurring transactions</Text>
       {rules.length === 0 && <Text style={styles.empty}>No recurring transactions yet.</Text>}
       {sortByRecent(rules).map((rule) => {
         const cat = findCategory(categories, rule.category);
         const sign = rule.type === 'income' ? '+' : '−';
         const color = rule.type === 'income' ? t.gain : t.spend;
         return (
-          <View key={rule.id} style={[styles.card, { opacity: rule.active ? 1 : 0.5 }]}>
-            <TouchableOpacity onPress={() => openEdit(rule)}>
-              <View style={styles.cardHeader}>
-                <View style={[styles.iconCircle, { backgroundColor: cat.color + '35' }]}><Text style={{ fontSize: 16 }}>{cat.icon}</Text></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{cat.label}{rule.note ? ' — ' + rule.note : ''}</Text>
-                  <Text style={styles.freq}>{describe(rule)}</Text>
-                </View>
-                <Text style={{ color, fontWeight: '600' }}>{sign}₱{rule.amount.toFixed(0)}</Text>
-              </View>
-            </TouchableOpacity>
-            <View style={styles.cardFooter}>
-              <TouchableOpacity onPress={() => confirmDelete(rule)}><Text style={{ color: t.inkFaint, fontSize: 12.5 }}>Delete</Text></TouchableOpacity>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ color: t.inkDim, fontSize: 12 }}>{rule.active ? 'Active' : 'Paused'}</Text>
-                <Switch value={rule.active} onValueChange={() => toggleActive(rule)} trackColor={{ false: t.edge, true: t.accent }} thumbColor="#FFFFFF" />
-              </View>
+          <TouchableOpacity key={rule.id} style={[styles.card, { opacity: rule.active ? 1 : 0.5 }]} onPress={() => openEdit(rule)}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.iconCircle, { backgroundColor: cat.color + '35' }]}><Text style={{ fontSize: 14 }}>{cat.icon}</Text></View>
+              <Text style={styles.name} numberOfLines={1}>{rule.note || cat.label}</Text>
             </View>
-          </View>
+            <View style={styles.track}><View style={[styles.fill, { width: `${cycleProgress(rule, today)}%`, backgroundColor: color }]} /></View>
+            <Text style={styles.amt}>{sign}₱{rule.amount.toFixed(0)}</Text>
+          </TouchableOpacity>
         );
       })}
 
@@ -138,6 +140,19 @@ export default function RecurringManager({ categories, rules, setRules }) {
                 </ScrollView>
               </>
             )}
+            {editingId && (() => {
+              const rule = rules.find((r) => r.id === editingId);
+              if (!rule) return null;
+              return (
+                <View style={styles.editFooter}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Switch value={rule.active} onValueChange={() => toggleActive(rule)} trackColor={{ false: t.edge, true: t.accent }} thumbColor="#FFFFFF" />
+                    <Text style={{ color: t.inkDim, fontSize: 12.5 }}>{rule.active ? 'Active' : 'Paused'}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => { setModalVisible(false); confirmDelete(rule); }}><Text style={{ color: t.spend, fontSize: 13 }}>Delete</Text></TouchableOpacity>
+                </View>
+              );
+            })()}
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}><Text style={{ color: t.onAccent, fontWeight: '600' }}>Save</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={{ color: t.inkDim, textAlign: 'center', marginTop: 12 }}>Cancel</Text></TouchableOpacity>
           </View>
@@ -148,16 +163,16 @@ export default function RecurringManager({ categories, rules, setRules }) {
 }
 
 const makeStyles = (t) => StyleSheet.create({
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { color: t.inkDim, fontSize: 13 },
-  addLink: { color: t.accent, fontSize: 13, fontWeight: '600' },
+  sectionTitle: { color: t.inkDim, fontSize: 13, marginBottom: 10 },
   empty: { color: t.inkFaint, fontSize: 13, marginBottom: 10 },
-  card: { backgroundColor: t.surface2, borderRadius: 16, padding: 14, marginBottom: 10 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  name: { color: t.ink, fontSize: 14 },
-  freq: { color: t.inkDim, fontSize: 11.5, marginTop: 2 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopColor: t.edge, borderTopWidth: 1 },
+  card: { backgroundColor: t.surface2, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  iconCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  name: { color: t.ink, fontSize: 15, fontWeight: '600', flex: 1 },
+  track: { height: 7, backgroundColor: t.bg, borderRadius: 4, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 4 },
+  amt: { color: t.inkDim, fontSize: 11.5, marginTop: 6 },
+  editFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, paddingVertical: 10, borderTopColor: t.edge, borderTopWidth: 1 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22, maxHeight: '88%' },
   sheetTitle: { color: t.ink, fontSize: 16, marginBottom: 16 },

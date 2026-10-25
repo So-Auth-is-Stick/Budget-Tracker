@@ -11,7 +11,7 @@ import { findCategory } from './categories';
 import { computeOverLimitFlags, periodSpent, limitFor } from './overLimit';
 import { getWeekRange, monthOf, daysUntil } from './dateUtils';
 import { useToday } from './useToday';
-import { useTheme } from './theme';
+import { useTheme, readableOn } from './theme';
 
 const GOAL_DOT = '#9C6ADE';
 
@@ -24,6 +24,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
   const [detailItem, setDetailItem] = useState(null);
   const [detailGoal, setDetailGoal] = useState(null);
   const [searchText, setSearchText] = useState('');
+  const [focusCat, setFocusCat] = useState(null); // tag whose spending dates are highlighted
 
   // Which expenses pushed a tag past its daily / weekly / monthly limit
   const flags = useMemo(() => computeOverLimitFlags(transactions, categories), [transactions, categories]);
@@ -54,6 +55,14 @@ export default function CalendarScreen({ categories, transactions, setTransactio
     if (overLimitDates[date]) dots.push({ key: 'warn', color: t.accent });
     if (goalsDueByDate[date]) dots.push({ key: 'goal', color: GOAL_DOT });
     marked[date] = { dots, marked: true };
+  });
+  // Highlight every day this tag was spent on, in the tag's own colour
+  const focusCategory = focusCat ? findCategory(categories, focusCat) : null;
+  const focusDates = focusCat
+    ? [...new Set(expenses.filter((tx) => tx.category === focusCat).map((tx) => tx.date))]
+    : [];
+  focusDates.forEach((date) => {
+    marked[date] = { ...(marked[date] || {}), selected: true, selectedColor: focusCategory.color, selectedTextColor: readableOn(focusCategory.color) };
   });
   if (selectedDate) {
     marked[selectedDate] = { ...(marked[selectedDate] || {}), selected: true, selectedColor: t.accent };
@@ -105,7 +114,11 @@ export default function CalendarScreen({ categories, transactions, setTransactio
   const closeDaySheet = () => { setSelectedDate(null); setSearchText(''); };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+    <View style={styles.container}>
+    <ScrollView
+      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 140 }}
+      showsVerticalScrollIndicator={false}
+    >
       <Calendar
         key={t.name}
         markingType="multi-dot"
@@ -125,6 +138,17 @@ export default function CalendarScreen({ categories, transactions, setTransactio
 
       <View style={styles.monthSection}>
         <Text style={styles.sectionTitle}>This month by tag</Text>
+        {monthEntries.length > 0 && !focusCat && <Text style={styles.tapHint}>Tap a tag to see its days on the calendar</Text>}
+        {focusCategory && (
+          <View style={[styles.focusChip, { borderColor: focusCategory.color }]}>
+            <Text style={styles.focusText} numberOfLines={1}>
+              {focusCategory.icon} {focusCategory.label} · {focusDates.length} {focusDates.length === 1 ? 'day' : 'days'} highlighted
+            </Text>
+            <TouchableOpacity onPress={() => setFocusCat(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={{ color: t.accent, fontWeight: '600', fontSize: 12.5 }}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {monthEntries.length === 0 ? (
           <Text style={styles.empty}>Nothing spent yet this month.</Text>
         ) : (
@@ -132,15 +156,21 @@ export default function CalendarScreen({ categories, transactions, setTransactio
             const cat = findCategory(categories, catId);
             const pct = monthMax > 0 ? (amt / monthMax) * 100 : 0;
             return (
-              <View key={catId} style={styles.barRow}>
+              <TouchableOpacity
+                key={catId}
+                activeOpacity={0.6}
+                style={[styles.barRow, focusCat && focusCat !== catId && { opacity: 0.4 }]}
+                onPress={() => setFocusCat(focusCat === catId ? null : catId)}
+              >
                 <Text style={styles.barName} numberOfLines={1}>{cat.icon} {cat.label}</Text>
                 <View style={styles.barTrack}><View style={[styles.barFill, { width: `${pct}%`, backgroundColor: cat.color }]} /></View>
                 <Text style={styles.barAmt}>₱{amt.toFixed(0)}</Text>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
       </View>
+    </ScrollView>
 
       <Modal visible={!!selectedDate} animationType="slide" transparent onRequestClose={closeDaySheet}>
         <View style={styles.overlay}>
@@ -219,7 +249,10 @@ const makeStyles = (t) => StyleSheet.create({
   weekStatValue: { color: t.spend, fontSize: 15, fontWeight: '600' },
   sectionTitle: { color: t.inkDim, fontSize: 13, marginBottom: 12 },
   monthSection: { paddingHorizontal: 20 },
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  tapHint: { color: t.inkFaint, fontSize: 11.5, marginBottom: 8, marginTop: -6 },
+  focusChip: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1.5, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 8 },
+  focusText: { color: t.ink, fontSize: 12.5, flex: 1, marginRight: 10 },
   barName: { width: 92, color: t.inkDim, fontSize: 12.5, flexShrink: 0 },
   barTrack: { flex: 1, height: 7, backgroundColor: t.surface2, borderRadius: 4, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 4 },

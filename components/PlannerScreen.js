@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { addGoal, updateGoal, deleteGoal, canCommit, isFullyFunded } from './goals';
+import { addGoal, updateGoal, deleteGoal, canCommit } from './goals';
 import DatePickerModal from './DatePickerModal';
 import GoalDetailModal from './GoalDetailModal';
 import RecurringManager from './RecurringManager';
-import { daysUntil } from './dateUtils';
 import { sortByRecent } from './sortUtils';
 import { useToday } from './useToday';
 import { useTheme } from './theme';
@@ -23,6 +22,8 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [detailGoal, setDetailGoal] = useState(null);
   const [startCommit, setStartCommit] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [recurringToken, setRecurringToken] = useState(0); // bump to open the recurring 'new' sheet
 
   // Most recently changed first
   const activeGoals = sortByRecent(goals.filter((g) => !g.committed));
@@ -48,43 +49,49 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
-      <View style={styles.heroCard}>
-        <Text style={styles.heroLabel}>Total saved</Text>
-        <Text style={styles.heroAmt}>₱{totalSaved.toFixed(2)}</Text>
+      {menuOpen && <TouchableOpacity activeOpacity={1} style={styles.menuBackdrop} onPress={() => setMenuOpen(false)} />}
+      <View style={styles.heroWrap}>
+        <View style={styles.heroCard}>
+          <View>
+            <Text style={styles.heroLabel}>Total saved</Text>
+            <Text style={styles.heroAmt}>₱{totalSaved.toFixed(2)}</Text>
+          </View>
+          <TouchableOpacity style={styles.plusBtn} onPress={() => setMenuOpen((v) => !v)} accessibilityLabel="Add new">
+            <Text style={styles.plusText}>{menuOpen ? '×' : '+'}</Text>
+          </TouchableOpacity>
+        </View>
+        {menuOpen && (
+          <View style={styles.menu}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); openAdd(); }}>
+              <Text style={styles.menuText}>🎯  Savings / payment</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); setRecurringToken((n) => n + 1); }}>
+              <Text style={styles.menuText}>🔁  Recurring</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 160, paddingHorizontal: 20 }}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Savings & upcoming payments</Text>
-          <TouchableOpacity onPress={openAdd}><Text style={styles.addLink}>+ Add</Text></TouchableOpacity>
-        </View>
+        <Text style={styles.sectionTitle}>Savings & upcoming payments</Text>
         {activeGoals.length === 0 && <Text style={styles.empty}>Nothing set aside yet.</Text>}
         {activeGoals.map((g) => {
           const pct = Math.min(100, (g.savedAmount / g.targetAmount) * 100);
-          const remaining = g.dueDate ? daysUntil(g.dueDate) : null;
           const ready = canCommit(g, today);
           return (
             <TouchableOpacity key={g.id} style={styles.card} onPress={() => openDetail(g, false)}>
               <View style={styles.cardHeader}>
-                <View style={styles.iconCircle}><Text style={{ fontSize: 16 }}>🎯</Text></View>
-                <Text style={styles.name}>{g.label}</Text>
-              </View>
-              {remaining !== null && (
-                <Text style={[styles.due, remaining < 0 && { color: t.spend }]}>
-                  {remaining < 0 ? `Overdue by ${Math.abs(remaining)}d` : remaining === 0 ? 'Due today' : `Due in ${remaining}d`}
-                </Text>
-              )}
-              {!!g.note && <Text style={styles.note}>{g.note}</Text>}
-              <Text style={styles.amt}>₱{g.savedAmount.toFixed(0)} / ₱{g.targetAmount.toFixed(0)}</Text>
-              <View style={styles.track}><View style={[styles.fill, { width: `${pct}%` }]} /></View>
-              {ready && (
-                <View style={styles.readyRow}>
-                  <Text style={styles.readyText}>{isFullyFunded(g) ? '✓ Fully funded' : 'Due, not fully funded'}</Text>
+                <View style={styles.iconCircle}><Text style={{ fontSize: 14 }}>🎯</Text></View>
+                <Text style={styles.name} numberOfLines={1}>{g.label}</Text>
+                {ready && (
                   <TouchableOpacity style={styles.commitPill} onPress={() => openDetail(g, true)}>
                     <Text style={styles.commitPillText}>Commit</Text>
                   </TouchableOpacity>
-                </View>
-              )}
+                )}
+              </View>
+              <View style={styles.track}><View style={[styles.fill, { width: `${pct}%` }]} /></View>
+              <Text style={styles.amt}>₱{g.savedAmount.toFixed(0)} / ₱{g.targetAmount.toFixed(0)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -102,7 +109,7 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
         )}
 
         <View style={styles.divider} />
-        <RecurringManager categories={categories} rules={recurringRules} setRules={setRecurringRules} />
+        <RecurringManager categories={categories} rules={recurringRules} setRules={setRecurringRules} openAddToken={recurringToken} />
       </ScrollView>
 
       <Modal visible={addVisible} animationType="slide" transparent onRequestClose={() => setAddVisible(false)}>
@@ -139,27 +146,29 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
 
 const makeStyles = (t) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.bg },
-  heroCard: { backgroundColor: t.surface2, borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 20 },
+  heroWrap: { marginHorizontal: 20, marginBottom: 20, zIndex: 10 },
+  heroCard: { backgroundColor: t.surface2, borderRadius: 20, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  plusBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' },
+  plusText: { color: t.onAccent, fontSize: 26, lineHeight: 30, fontWeight: '500' },
+  menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 },
+  menu: { position: 'absolute', top: 66, right: 14, backgroundColor: t.surface, borderColor: t.edge, borderWidth: 1, borderRadius: 14, paddingVertical: 4, minWidth: 190, elevation: 8, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+  menuItem: { paddingVertical: 13, paddingHorizontal: 16 },
+  menuText: { color: t.ink, fontSize: 14.5 },
+  menuDivider: { height: 1, backgroundColor: t.edge },
   heroLabel: { color: t.inkDim, fontSize: 13, marginBottom: 6 },
   heroAmt: { color: t.accent, fontSize: 30, fontWeight: '700' },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTitle: { color: t.inkDim, fontSize: 13, marginBottom: 10 },
-  addLink: { color: t.accent, fontSize: 13, fontWeight: '600', marginBottom: 10 },
   empty: { color: t.inkFaint, fontSize: 13, marginBottom: 10 },
   divider: { height: 1, backgroundColor: t.edge, marginVertical: 22 },
-  card: { backgroundColor: t.accent + '18', borderColor: t.accent + '55', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  iconCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: t.accent + '35', alignItems: 'center', justifyContent: 'center' },
-  name: { color: t.ink, fontSize: 15, fontWeight: '600' },
-  due: { color: t.inkDim, fontSize: 12, marginBottom: 6 },
-  note: { color: t.inkDim, fontSize: 12.5, marginBottom: 8 },
-  amt: { color: t.ink, fontSize: 13, marginBottom: 6 },
+  card: { backgroundColor: t.accent + '18', borderColor: t.accent + '55', borderWidth: 1, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  iconCircle: { width: 28, height: 28, borderRadius: 14, backgroundColor: t.accent + '35', alignItems: 'center', justifyContent: 'center' },
+  name: { color: t.ink, fontSize: 15, fontWeight: '600', flex: 1 },
+  amt: { color: t.inkDim, fontSize: 11.5, marginTop: 6 },
   track: { height: 7, backgroundColor: t.bg, borderRadius: 4, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 4, backgroundColor: t.accent },
-  readyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-  readyText: { color: t.gain, fontSize: 12.5, fontWeight: '600' },
-  commitPill: { backgroundColor: t.accent, borderRadius: 14, paddingVertical: 7, paddingHorizontal: 16 },
-  commitPillText: { color: t.onAccent, fontWeight: '700', fontSize: 13 },
+  commitPill: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 5, paddingHorizontal: 12 },
+  commitPillText: { color: t.onAccent, fontWeight: '700', fontSize: 12 },
   doneRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, borderBottomColor: t.edge, borderBottomWidth: 1 },
   doneName: { color: t.inkDim, fontSize: 14 },
   doneAmt: { color: t.inkDim, fontSize: 14 },
