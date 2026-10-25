@@ -1,8 +1,10 @@
-# Builds the Android APK on GitHub's own servers (no waiting in the Expo build queue)
-# and signs it with the same key EAS already holds for your app, so it installs as an UPDATE.
+# Builds the Android APK on GitHub's servers and signs it with the key EAS already holds
+# for your app, so it installs as an UPDATE over the old app (your data stays).
 #
 # Run it: GitHub repo > Actions > "Build Android APK" > Run workflow,
 # or push a tag like v1.1.0 to also attach the APK to a GitHub Release.
+#
+# If this one keeps failing, use "Build Android APK (Expo cloud)" instead - same result, fewer moving parts.
 name: Build Android APK
 
 on:
@@ -13,47 +15,59 @@ on:
 permissions:
   contents: write   # lets the job create a Release when you push a tag
 
+env:
+  CI: "1"
+  EAS_NO_VCS: "0"
+
 jobs:
   build:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
-      - name: Set up JDK
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17   # Use 17 for Expo SDK 51-53; bump to 21 if using newer Gradle 8.10+
+          java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@v3
 
-      - name: Set up Expo and EAS CLI
-        uses: expo/expo-github-action@v9
+      - uses: expo/expo-github-action@v8
         with:
           eas-version: latest
-          packager: npm     # Explicitly use npm (default is yarn)
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Install dependencies
-        run: npm ci
+      # Plain-English checks, so a missing piece is named instead of hidden in a wall of log text.
+      - name: Check the project is set up
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [ -n "${{ secrets.EXPO_TOKEN }}" ] || fail "EXPO_TOKEN secret is missing. Repo > Settings > Secrets and variables > Actions > New repository secret."
+          [ -f package.json ] || fail "package.json is not at the top of the repo. Upload the contents of the BudgetTracker folder, not the folder itself."
+          [ -f app.json ] || fail "app.json is missing from the repo."
+          [ -f eas.json ] || fail "eas.json is missing from the repo."
+          grep -q '"preview"' eas.json || fail 'eas.json has no "preview" profile.'
+          grep -q '"projectId"' app.json || fail 'app.json has no extra.eas.projectId. Run "eas init" once on your computer, then commit app.json.'
+          node -v && npm -v
+          eas whoami
+
+      # `npm ci` stops if package-lock.json disagrees with package.json (yours still listed
+      # drizzle, reanimated, sqlite... that were removed). `npm install` just repairs it.
+      - name: Install packages
+        run: npm install --no-audit --no-fund
 
       - name: Build the APK on this runner
-        run: eas build --platform android --profile preview --local --non-interactive --output ./ledger.apk
+        run: eas build --platform android --profile preview --local --non-interactive --output "$GITHUB_WORKSPACE/ledger.apk"
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v4
         with:
           name: ledger-apk
           path: ledger.apk
+          if-no-files-found: error
 
       - name: Attach the APK to a GitHub Release
         if: startsWith(github.ref, 'refs/tags/')

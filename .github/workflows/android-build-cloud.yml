@@ -1,0 +1,23 @@
+# Simplest option: GitHub just tells Expo's servers to build. No Java / Android setup here,
+# so there is very little that can break. Download the APK from expo.dev > your project > Builds
+# (or the link printed in the log).
+name: Build Android APK (Expo cloud)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm install --no-audit --no-fund
+      - run: eas build --platform android --profile preview --non-interactive --no-wait
