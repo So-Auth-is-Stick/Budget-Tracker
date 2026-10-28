@@ -17,6 +17,8 @@ export const DEFAULT_PREFS = {
   hideAmounts: false,     // privacy: show ₱•••• instead of numbers
   backupNudgeAt: null,
   recapDismissed: null,
+  onboarded: false,
+  lastAccount: null,
 };
 
 let current = { ...DEFAULT_PREFS };

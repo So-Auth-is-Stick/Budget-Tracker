@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView, StyleSheet, Switch, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ChangePinModal from './ChangePinModal';
+import { AccountsManager } from './AccountsUI';
+import { useAccounts } from './accounts';
 import { useTheme, THEMES, THEME_ORDER } from './theme';
 import { usePrefs } from './prefs';
 import { biometricAvailable, biometricUnlock } from './biometric';
@@ -19,7 +21,7 @@ function daysAgo(iso) {
   return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
 }
 
-export default function SettingsModal({ visible, onClose, onDataRestored, transactions = [], categories = [] }) {
+export default function SettingsModal({ visible, onClose, onDataRestored, transactions = [], categories = [], setTransactions }) {
   const { theme: t, themeKey, setThemeKey } = useTheme();
   const { prefs, setPref } = usePrefs();
   const toast = useToast();
@@ -28,6 +30,8 @@ export default function SettingsModal({ visible, onClose, onDataRestored, transa
   const [bio, setBio] = useState({ ok: false, label: 'Fingerprint' });
   const [busy, setBusy] = useState(null);
   const [canUndo, setCanUndo] = useState(false);
+  const [accountsOpen, setAccountsOpen] = useState(false);
+  const { accounts } = useAccounts();
 
   useEffect(() => {
     if (!visible) return;
@@ -157,6 +161,11 @@ export default function SettingsModal({ visible, onClose, onDataRestored, transa
             </View>
             <Text style={styles.hint}>Auto follows your phone's light/dark setting.</Text>
 
+            <Text style={styles.sectionLabel}>Money</Text>
+            <View style={styles.group}>
+              <Button icon="wallet-outline" label="Accounts" hint={accounts.length ? accounts.map((a) => a.icon + ' ' + a.label).join('  ') : 'Off · track cash, GCash, bank separately'} onPress={() => setAccountsOpen(true)} />
+            </View>
+
             <Text style={styles.sectionLabel}>Security</Text>
             <View style={styles.group}>
               <Row icon="finger-print" label={`Unlock with ${bio.label.toLowerCase()}`} hint={bio.ok ? 'Your PIN still works too.' : 'Not set up on this phone.'}
@@ -200,7 +209,7 @@ export default function SettingsModal({ visible, onClose, onDataRestored, transa
               <View style={styles.sep} />
               <Button icon="grid-outline" label="Export as spreadsheet (.csv)" hint="Opens in Excel or Google Sheets" loading={busy === 'csv'} onPress={async () => {
                 setBusy('csv');
-                try { const n = await exportCsv(transactions, categories); toast.show(`Exported ${n} entries`); }
+                try { const n = await exportCsv(transactions, categories, accounts); toast.show(`Exported ${n} entries`); }
                 catch (e) { Alert.alert('Export failed', String(e.message || e)); }
                 finally { setBusy(null); }
               }} />
@@ -221,6 +230,7 @@ export default function SettingsModal({ visible, onClose, onDataRestored, transa
             <Text style={styles.footer}>Ledger · data stays on this phone</Text>
           </ScrollView>
           <ChangePinModal visible={pinVisible} onClose={() => setPinVisible(false)} />
+          <AccountsManager visible={accountsOpen} onClose={() => setAccountsOpen(false)} transactions={transactions} setTransactions={setTransactions} />
         </View>
       </View>
     </Modal>

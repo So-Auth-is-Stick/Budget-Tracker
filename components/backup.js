@@ -5,7 +5,7 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { todayStr } from './dateUtils';
 
-export const DATA_KEYS = ['budget_transactions', 'budget_categories', 'budget_goals', 'budget_recurring', 'budget_theme', 'budget_prefs'];
+export const DATA_KEYS = ['budget_transactions', 'budget_categories', 'budget_goals', 'budget_recurring', 'budget_iou', 'budget_accounts', 'budget_transfers', 'budget_theme', 'budget_prefs'];
 const PRE_RESTORE_KEY = 'budget_prerestore_snapshot';
 
 async function snapshot() {
@@ -20,7 +20,7 @@ async function snapshot() {
 
 export function summarize(data) {
   const n = (k) => (Array.isArray(data[k]) ? data[k].length : 0);
-  return { transactions: n('budget_transactions'), tags: n('budget_categories'), plans: n('budget_goals'), recurring: n('budget_recurring') };
+  return { transactions: n('budget_transactions'), tags: n('budget_categories'), plans: n('budget_goals'), recurring: n('budget_recurring'), ious: n('budget_iou') };
 }
 
 // Creates the file and opens the share sheet (Drive, Gmail, Files, Messenger...)
@@ -75,7 +75,7 @@ async function writeData(data) {
   const sets = [];
   const removes = [];
   DATA_KEYS.forEach((k) => {
-    if (data[k] === undefined) { if (k !== 'budget_theme' && k !== 'budget_prefs') removes.push(k); return; }
+    if (data[k] === undefined) { if (!['budget_theme', 'budget_prefs', 'budget_iou', 'budget_accounts', 'budget_transfers'].includes(k)) removes.push(k); return; }
     sets.push([k, typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k])]);
   });
   if (sets.length) await AsyncStorage.multiSet(sets);
@@ -83,24 +83,27 @@ async function writeData(data) {
 }
 
 // Spreadsheet-friendly copy of every entry (opens in Excel / Google Sheets)
-export function toCsv(transactions, categories) {
+export function toCsv(transactions, categories, accounts = []) {
   const esc = (v) => {
     const s = String(v == null ? '' : v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const label = (id) => (categories.find((c) => c.id === id) || { label: id }).label;
+  const def = (accounts.find((a) => a.isDefault) || accounts[0] || {}).id;
+  const accName = (tx) => (accounts.find((a) => a.id === (tx.account && accounts.some((x) => x.id === tx.account) ? tx.account : def)) || {}).label || '';
   const rows = [...transactions].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id).map((tx) => [
     tx.date, tx.type === 'income' ? 'Earned' : 'Spent', label(tx.category), tx.note || '',
-    (tx.type === 'income' ? 1 : -1) * tx.amount,
+    (tx.type === 'income' ? 1 : -1) * tx.amount, ...(accounts.length ? [accName(tx)] : []),
   ]);
-  return '﻿' + [['Date', 'Type', 'Tag', 'Description', 'Amount'], ...rows].map((r) => r.map(esc).join(',')).join('\r\n');
+  const head = ['Date', 'Type', 'Tag', 'Description', 'Amount', ...(accounts.length ? ['Account'] : [])];
+  return '\uFEFF' + [head, ...rows].map((r) => r.map(esc).join(',')).join('\r\n');
 }
 
-export async function exportCsv(transactions, categories) {
+export async function exportCsv(transactions, categories, accounts = []) {
   const file = new File(Paths.cache, `ledger-${todayStr()}.csv`);
   if (file.exists) file.delete();
   file.create();
-  file.write(toCsv(transactions, categories));
+  file.write(toCsv(transactions, categories, accounts));
   await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Export entries', UTI: 'public.comma-separated-values-text' });
   return transactions.length;
 }

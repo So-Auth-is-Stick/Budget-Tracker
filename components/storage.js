@@ -46,3 +46,15 @@ export async function reassignCategory(fromId, toId) {
   await saveTransactions(updated);
   return updated;
 }
+
+// When an account is deleted its entries fall back to the default account
+export async function clearAccount(accountId) {
+  const list = await loadTransactions();
+  const updated = list.map((t) => {
+    if (t.account !== accountId) return t;
+    const { account, ...rest } = t;
+    return rest;
+  });
+  await saveTransactions(updated);
+  return updated;
+}

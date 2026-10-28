@@ -6,6 +6,7 @@ import { findCategory } from './categories';
 import { formatLong, todayStr } from './dateUtils';
 import { useTheme, readableOn } from './theme';
 import { peso } from './format';
+import { useAccounts, accountOf } from './accounts';
 
 export default function TransactionDetailModal({ visible, item, categories, onClose, onDelete, onSave, onDuplicate }) {
   const { theme: t } = useTheme();
@@ -16,6 +17,8 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
   const [categoryId, setCategoryId] = useState(null);
   const [date, setDate] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const { accounts } = useAccounts();
+  const [accountId, setAccountId] = useState(null);
 
   useEffect(() => {
     if (item) {
@@ -23,6 +26,7 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
       setNote(item.note || '');
       setCategoryId(item.category);
       setDate(item.date);
+      setAccountId(accountOf(item, accounts));
       setEditing(false);
     }
   }, [item]);
@@ -44,7 +48,7 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
   const value = parseFloat(String(amount).replace(/,/g, ''));
   const handleSaveEdit = () => {
     if (!value || value <= 0 || !categoryId) return;
-    onSave(item.id, { amount: Math.round(value * 100) / 100, note: note.trim(), category: categoryId, date });
+    onSave(item.id, { amount: Math.round(value * 100) / 100, note: note.trim(), category: categoryId, date, ...(accounts.length > 1 && accountId ? { account: accountId } : {}) });
     setEditing(false);
     onClose();
   };
@@ -61,7 +65,7 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
                 <View style={[styles.iconCircle, { backgroundColor: cat.color + '33', borderColor: cat.color }]}><Text style={{ fontSize: 22 }}>{cat.icon}</Text></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.tag}>{cat.label}</Text>
-                  <Text style={styles.date}>{formatLong(item.date)}, {year}{auto ? ' · recurring' : ''}{item.goalId ? ' · from a plan' : ''}</Text>
+                  <Text style={styles.date}>{formatLong(item.date)}, {year}{accounts.length > 1 ? ` · ${(accounts.find((a) => a.id === accountOf(item, accounts)) || {}).label || ''}` : ''}{auto ? ' · recurring' : ''}{item.goalId ? ' · from a plan' : ''}</Text>
                 </View>
               </View>
               <Text style={[styles.amount, { color: amountColor }]}>{sign}{peso(item.amount, 2)}</Text>
@@ -104,6 +108,15 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
                   </TouchableOpacity>
                 ))}
               </View>
+              {accounts.length > 1 && (
+                <View style={styles.chipWrap}>
+                  {accounts.map((a) => (
+                    <TouchableOpacity key={a.id} onPress={() => setAccountId(a.id)} style={[styles.chip, accountId === a.id && { backgroundColor: a.color + '33', borderColor: a.color }]}>
+                      <Text style={{ color: t.ink, fontSize: 12.5 }}>{a.icon} {a.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
               <TextInput style={styles.textField} placeholder="Description" placeholderTextColor={t.inkFaint} value={note} onChangeText={setNote} maxLength={80} />
               <TouchableOpacity style={styles.dateBtn} onPress={() => setPickerOpen(true)}>
                 <Ionicons name="calendar-outline" size={17} color={t.ink} />

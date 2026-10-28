@@ -10,9 +10,11 @@ import BudgetScreen from './components/BudgetScreen';
 import PlannerScreen from './components/PlannerScreen';
 import AddTransactionSheet from './components/AddTransactionSheet';
 import DuePlansModal from './components/DuePlansModal';
+import WelcomeFlow from './components/WelcomeFlow';
 import { ThemeProvider, useTheme } from './components/theme';
 import { PrefsProvider, usePrefs } from './components/prefs';
 import { ToastProvider, useToast } from './components/toast';
+import { AccountsProvider, useAccounts } from './components/accounts';
 import { loadCategories } from './components/categories';
 import { loadTransactions, addTransaction, addTransactions } from './components/storage';
 import { loadGoals, updateGoal } from './components/goals';
@@ -36,7 +38,8 @@ const TABS = [
 
 function Main() {
   const { theme: t } = useTheme();
-  const { prefs, reload: reloadPrefs } = usePrefs();
+  const { prefs, setPref, reload: reloadPrefs } = usePrefs();
+  const { reload: reloadAccounts } = useAccounts();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(t, insets), [t, insets]);
@@ -80,8 +83,8 @@ function Main() {
     setTransactions(txs);
     setGoals(gls);
     setRecurringRules(rules);
-    await reloadPrefs();
-  }, [reloadPrefs]);
+    await Promise.all([reloadPrefs(), reloadAccounts()]);
+  }, [reloadPrefs, reloadAccounts]);
 
   useEffect(() => {
     (async () => {
@@ -112,6 +115,19 @@ function Main() {
     }, 1500);
     return () => clearTimeout(id);
   }, [loaded, goals, recurringRules, categories, transactions, prefs, today]);
+
+  // First run: a short welcome. People who already have data never see it.
+  const needsWelcome = loaded && unlocked && !prefs.onboarded && transactions.length === 0;
+  useEffect(() => {
+    if (loaded && !prefs.onboarded && transactions.length > 0) setPref('onboarded', true);
+  }, [loaded, prefs.onboarded, transactions.length, setPref]);
+  const finishWelcome = async ({ startingBalance }) => {
+    setPref('onboarded', true);
+    if (startingBalance > 0) {
+      const inc = categories.find((c) => c.id === 'other_inc') || categories.find((c) => c.type === 'income');
+      if (inc) setTransactions(await addTransaction({ id: Date.now(), type: 'income', amount: startingBalance, category: inc.id, note: 'Starting balance', date: todayStr() }));
+    }
+  };
 
   // Plans whose date has come and that haven't been committed yet
   const dueGoals = useMemo(
@@ -201,6 +217,7 @@ function Main() {
       </View>
 
       <AddTransactionSheet visible={addVisible} onClose={() => setAddVisible(false)} categories={categories} setCategories={setCategories} transactions={transactions} onSave={txActions.add} initialDate={addDate} />
+      <WelcomeFlow visible={needsWelcome} onDone={finishWelcome} />
       <DuePlansModal
         visible={dueOpen}
         goals={promptGoals}
@@ -219,7 +236,9 @@ export default function App() {
       <PrefsProvider>
         <SafeAreaProvider>
           <ToastProvider>
-            <Main />
+            <AccountsProvider>
+              <Main />
+            </AccountsProvider>
           </ToastProvider>
         </SafeAreaProvider>
       </PrefsProvider>

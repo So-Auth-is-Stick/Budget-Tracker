@@ -16,6 +16,8 @@ import { usePrefs } from './prefs';
 import { peso, pesoShort } from './format';
 import { loggingStreak, lastMonthRecap, monthLabel } from './insights';
 import InsightsScreen from './InsightsScreen';
+import { useAccounts, accountBalances } from './accounts';
+import { TransferSheet, AccountActivity } from './AccountsUI';
 import * as haptic from './haptics';
 
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -39,6 +41,10 @@ export default function FeedScreen({ categories, setCategories, transactions, se
   const [activeFilterCat, setActiveFilterCat] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null); // tapped bar in the week chart
   const [insightsMonth, setInsightsMonth] = useState(null);
+  const { accounts, transfers } = useAccounts();
+  const [transferFrom, setTransferFrom] = useState(null); // null = closed, '' = open with default
+  const [activityAcc, setActivityAcc] = useState(null);
+  const accBalances = useMemo(() => accountBalances(accounts, transactions, transfers), [accounts, transactions, transfers]);
 
   const sumOf = (list) => list.reduce((s, tx) => s + tx.amount, 0);
   const balance = sumOf(transactions.filter((tx) => tx.type === 'income')) - sumOf(transactions.filter((tx) => tx.type === 'expense'));
@@ -118,6 +124,23 @@ export default function FeedScreen({ categories, setCategories, transactions, se
           <Text style={[styles.statValue, { color: safeToSpend >= 0 ? t.gain : t.spend }]} numberOfLines={1} adjustsFontSizeToFit>{peso(safeToSpend, 2)}</Text>
         </View>
       </View>
+
+      {accounts.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.accStrip} style={{ flexGrow: 0, marginBottom: 12 }}>
+          {accounts.map((a) => (
+            <TouchableOpacity key={a.id} style={[styles.accCard, { borderColor: a.color + '88' }]} onPress={() => setActivityAcc(a)}>
+              <Text style={styles.accName} numberOfLines={1}>{a.icon} {a.label}</Text>
+              <Text style={[styles.accBal, (accBalances[a.id] || 0) < 0 && { color: t.spend }]} numberOfLines={1} adjustsFontSizeToFit>{peso(accBalances[a.id] || 0, 0)}</Text>
+            </TouchableOpacity>
+          ))}
+          {accounts.length > 1 && (
+            <TouchableOpacity style={[styles.accCard, styles.accMove]} onPress={() => setTransferFrom('')}>
+              <Ionicons name="swap-horizontal" size={20} color={t.accent} />
+              <Text style={styles.accMoveText}>Move money</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      )}
 
       <View style={styles.weekCard}>
         <View style={styles.weekHead}>
@@ -244,7 +267,10 @@ export default function FeedScreen({ categories, setCategories, transactions, se
 
       <TransactionDetailModal visible={!!detailItem} item={detailItem} categories={categories} onClose={() => setDetailItem(null)} onDelete={handleDelete} onSave={handleEditSave}
         onDuplicate={(it) => txActions.add({ type: it.type, amount: it.amount, category: it.category, note: (it.note || '').replace(/ \(auto\)$/, ''), id: Date.now(), date: today })} />
-      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} onDataRestored={onDataRestored} transactions={transactions} categories={categories} />
+      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} onDataRestored={onDataRestored} transactions={transactions} categories={categories} setTransactions={setTransactions} />
+      <TransferSheet visible={transferFrom !== null} presetFrom={transferFrom || undefined} onClose={() => setTransferFrom(null)} />
+      <AccountActivity account={activityAcc} onClose={() => setActivityAcc(null)} transactions={transactions} categories={categories}
+        onMove={(id) => { setActivityAcc(null); setTimeout(() => setTransferFrom(id), 350); }} />
       <InsightsScreen visible={!!insightsMonth} initialMonth={insightsMonth} onClose={() => setInsightsMonth(null)} transactions={transactions} categories={categories} goals={goals} />
     </View>
   );
@@ -263,6 +289,12 @@ const makeStyles = (t) => StyleSheet.create({
   statCard: { flex: 1, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 14 },
   statLabel: { color: t.inkDim, fontSize: 12, marginBottom: 4 },
   statValue: { fontSize: 18, fontWeight: '700' },
+  accStrip: { paddingHorizontal: 20, gap: 10 },
+  accCard: { minWidth: 120, maxWidth: 170, backgroundColor: t.surface, borderRadius: 14, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 12 },
+  accName: { color: t.inkDim, fontSize: 12, marginBottom: 3 },
+  accBal: { color: t.ink, fontSize: 16, fontWeight: '700' },
+  accMove: { borderStyle: 'dashed', borderColor: t.accent, alignItems: 'center', justifyContent: 'center', minWidth: 100, gap: 2 },
+  accMoveText: { color: t.accent, fontSize: 12, fontWeight: '700' },
   weekCard: { marginHorizontal: 20, backgroundColor: t.surface, borderRadius: 18, padding: 14, marginBottom: 12 },
   weekHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   weekTitle: { color: t.inkDim, fontSize: 13 },

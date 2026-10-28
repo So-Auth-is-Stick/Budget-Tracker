@@ -8,6 +8,7 @@ import { goalIcon, goalColor } from './goalStyle';
 import { readableOn } from './theme';
 import * as haptic from './haptics';
 import RecurringManager from './RecurringManager';
+import IouManager from './IouManager';
 import { sortByRecent } from './sortUtils';
 import { formatLong } from './dateUtils';
 import { useToday } from './useToday';
@@ -31,6 +32,7 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
   const [startCommit, setStartCommit] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [recurringToken, setRecurringToken] = useState(0); // bump to open the recurring 'new' sheet
+  const [iouToken, setIouToken] = useState(0);
 
   // Most recently changed first
   const activeGoals = sortByRecent(goals.filter((g) => !g.committed));
@@ -81,6 +83,10 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
             <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); setRecurringToken((n) => n + 1); }}>
               <Text style={styles.menuText}>🔁  Recurring</Text>
             </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuOpen(false); setIouToken((n) => n + 1); }}>
+              <Text style={styles.menuText}>🤝  Lent / borrowed</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -123,6 +129,8 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
 
         <View style={styles.divider} />
         <RecurringManager categories={categories} rules={recurringRules} setRules={setRecurringRules} openAddToken={recurringToken} />
+        <View style={styles.divider} />
+        <IouManager openAddToken={iouToken} />
       </ScrollView>
 
       <Modal visible={addVisible} animationType="slide" transparent onRequestClose={() => setAddVisible(false)}>

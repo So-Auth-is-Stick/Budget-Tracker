@@ -6,9 +6,9 @@ const DEFAULT_CATEGORIES = [
   { id: 'food', label: 'Food', icon: '🍜', color: '#D97A55', type: 'expense' },
   { id: 'transport', label: 'Transport', icon: '🚌', color: '#C9954A', type: 'expense' },
   { id: 'bills', label: 'Bills', icon: '💡', color: '#B85C7A', type: 'expense' },
-  { id: 'other_exp', label: 'Other', icon: '◦', color: '#8A8A8A', type: 'expense' },
+  { id: 'other_exp', label: 'Other', icon: '🧩', color: '#8A8A8A', type: 'expense' },
   { id: 'salary', label: 'Salary', icon: '💼', color: '#7FC29B', type: 'income' },
-  { id: 'other_inc', label: 'Other', icon: '◦', color: '#8A8A8A', type: 'income' },
+  { id: 'other_inc', label: 'Other', icon: '💵', color: '#8A8A8A', type: 'income' },
 ];
 
 export async function loadCategories() {

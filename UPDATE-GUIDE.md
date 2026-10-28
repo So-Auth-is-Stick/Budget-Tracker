@@ -66,6 +66,11 @@ From then on your data is safe even if the phone is lost.
 * Plans get their own icon and colour, a "set aside ₱X a day to make it" hint, +₱100/+₱500/+₱1,000 buttons and a little celebration when fully funded.
 * Recurring entries can repeat **twice a month** (15th + last day, like a semi-monthly payroll).
 
+**New in round 3**
+* **Accounts** (optional, Settings → Accounts): Cash, GCash, Maya, Bank… each with its own balance on the Balance screen. **Move money** between them (ATM, cash-in) without it counting as spending. Your existing entries belong to the first ("main") account.
+* **Lent & borrowed** (Planner → + → Lent / borrowed): keep track of utang both ways, record partial pay-backs, see totals owed to you / by you.
+* A short **welcome** for new users (useful if you share the app): what it does, starting balance, pick a theme. You won't see it, because you already have data.
+
 **Safety**
 * **Backup / restore** to a file (Drive, Gmail…), with undo for a restore, plus a reminder if you've never backed up. **Export to spreadsheet (.csv)**.
 * **Reminders**: plans due (day before + on the day), recurring entries, optional evening "log today?" nudge.

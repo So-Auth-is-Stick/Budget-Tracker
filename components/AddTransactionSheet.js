@@ -8,6 +8,8 @@ import { peso } from './format';
 import { useTheme, readableOn } from './theme';
 import * as haptic from './haptics';
 import { frequentEntries } from './insights';
+import { useAccounts, defaultAccountId } from './accounts';
+import { usePrefs } from './prefs';
 
 const shiftDay = (ds, n) => {
   const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
@@ -24,9 +26,13 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
   const [date, setDate] = useState(todayStr());
   const [pickerVisible, setPickerVisible] = useState(false);
   const [noteFocused, setNoteFocused] = useState(false);
+  const { accounts } = useAccounts();
+  const { prefs, setPref } = usePrefs();
+  const [accountId, setAccountId] = useState(null);
 
   useEffect(() => {
     if (visible) {
+      setAccountId(accounts.some((a) => a.id === prefs.lastAccount) ? prefs.lastAccount : defaultAccountId(accounts) || null);
       setType('expense'); setCategoryId(null); setAmount(''); setNote(''); setDate(initialDate && initialDate <= todayStr() ? initialDate : todayStr());
     }
   }, [visible]);
@@ -85,7 +91,9 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
 
   const save = async () => {
     if (!valid) { haptic.warning(); return; }
-    await onSave({ id: Date.now(), type, amount: Math.round(value * 100) / 100, category: categoryId, note: note.trim(), date });
+    const acc = accounts.length > 1 && accountId ? { account: accountId } : {};
+    if (acc.account) setPref('lastAccount', acc.account);
+    await onSave({ id: Date.now(), type, amount: Math.round(value * 100) / 100, category: categoryId, note: note.trim(), date, ...acc });
     onClose();
   };
 
@@ -161,6 +169,17 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
               </View>
             )}
 
+            {accounts.length > 1 && (
+              <View style={styles.accRow}>
+                {accounts.map((a) => (
+                  <TouchableOpacity key={a.id} onPress={() => { haptic.tap(); setAccountId(a.id); }}
+                    style={[styles.accChip, accountId === a.id && { backgroundColor: a.color + '33', borderColor: a.color }]}>
+                    <Text style={{ color: t.ink, fontSize: 12.5, fontWeight: accountId === a.id ? '700' : '400' }}>{a.icon} {a.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <View style={styles.dateRow}>
               {[[today, 'Today'], [yesterday, 'Yesterday']].map(([d, label]) => (
                 <TouchableOpacity key={d} onPress={() => setDate(d)} style={[styles.dateChip, date === d && styles.dateChipOn]}>
@@ -211,6 +230,8 @@ const makeStyles = (t) => StyleSheet.create({
   suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   suggest: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 12, backgroundColor: t.accent + '1F', maxWidth: 160 },
   suggestText: { color: t.ink, fontSize: 12.5 },
+  accRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2, marginBottom: 6 },
+  accChip: { paddingVertical: 6, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: t.edge },
   dateRow: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 18 },
   dateChip: { paddingVertical: 8, paddingHorizontal: 13, borderRadius: 16, backgroundColor: t.surface2 },
   dateChipOn: { backgroundColor: t.accent },
