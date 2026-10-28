@@ -102,5 +102,3 @@ jobs:
       - name: What to send if this failed
         if: failure()
         run: echo "::error::The build failed. Open the step above this one that has a red X and copy its last ~40 lines."
- 
-Claude finished the response
