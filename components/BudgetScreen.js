@@ -1,11 +1,16 @@
 import { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import InsightsScreen from './InsightsScreen';
+import { daysInMonth } from './insights';
+import * as haptic from './haptics';
 import { updateCategory } from './categories';
 import { monthOf, prevMonthOf, getWeekRange } from './dateUtils';
 import { sortByRecent } from './sortUtils';
 import { useToday } from './useToday';
 import { useTheme } from './theme';
+import { peso } from './format';
 
 export default function BudgetScreen({ categories, setCategories, transactions }) {
   const { theme: t } = useTheme();
@@ -16,6 +21,7 @@ export default function BudgetScreen({ categories, setCategories, transactions }
   const [dailyInput, setDailyInput] = useState('');
   const [weeklyInput, setWeeklyInput] = useState('');
   const [monthlyInput, setMonthlyInput] = useState('');
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   const currentMonth = monthOf(today);
   const lastMonth = prevMonthOf(currentMonth);
@@ -43,6 +49,24 @@ export default function BudgetScreen({ categories, setCategories, transactions }
   const compareText = spendDiff === 0
     ? 'Same as last month'
     : `${spendDiff > 0 ? '▲' : '▼'} ${Math.abs(pctChange)}% ${spendDiff > 0 ? 'more' : 'less'} than last month`;
+
+  // Money left in the month's budget, spread over the days remaining (today included)
+  const dim = daysInMonth(currentMonth);
+  const daysLeft = dim - Number(today.slice(8, 10)) + 1;
+  const leftThisMonth = totalMonthlyBudget - totalMonthlySpent;
+  const perDayLeft = leftThisMonth > 0 ? leftThisMonth / daysLeft : 0;
+
+  // What this tag usually costs: average of the last 3 full months that had spending
+  const usualMonthly = (catId) => {
+    let m = lastMonth; const vals = [];
+    for (let i = 0; i < 3; i++) {
+      const v = spentWhere(catId, (tx) => monthOf(tx.date) === m);
+      if (v > 0) vals.push(v);
+      m = prevMonthOf(m);
+    }
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  };
+  const roundNice = (v) => (v >= 1000 ? Math.round(v / 100) * 100 : Math.round(v / 10) * 10);
 
   const openLimitModal = (cat) => {
     setLimitModalCat(cat);
@@ -73,7 +97,7 @@ export default function BudgetScreen({ categories, setCategories, transactions }
       <View style={styles.limitBlock} key={label}>
         <View style={styles.limitTop}>
           <Text style={styles.limitLabel}>{label}</Text>
-          <Text style={[styles.limitAmt, over && { color: t.spend }]}>{over ? '⚠️ ' : ''}₱{spent.toFixed(0)} / ₱{limit.toFixed(0)}</Text>
+          <Text style={[styles.limitAmt, over && { color: t.spend }]}>{over ? '⚠️ ' : ''}{peso(spent, 0)} / {peso(limit, 0)}</Text>
         </View>
         <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: over ? t.spend : color }]} /></View>
       </View>
@@ -84,18 +108,31 @@ export default function BudgetScreen({ categories, setCategories, transactions }
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 160 }}>
         <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Spent this month</Text>
+          <View style={styles.heroTop}>
+            <Text style={styles.heroLabel}>Spent this month</Text>
+            <TouchableOpacity style={styles.insightsBtn} onPress={() => { haptic.tap(); setInsightsOpen(true); }}>
+              <Ionicons name="analytics" size={15} color={t.onAccent} />
+              <Text style={styles.insightsText}>Insights</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.heroAmt}>
-            ₱{totalMonthlySpent.toFixed(0)}
-            {totalMonthlyBudget > 0 && <Text style={styles.heroOf}>  of ₱{totalMonthlyBudget.toFixed(0)} budgeted</Text>}
+            {peso(totalMonthlySpent, 0)}
+            {totalMonthlyBudget > 0 && <Text style={styles.heroOf}>  of {peso(totalMonthlyBudget, 0)} budgeted</Text>}
           </Text>
           {totalMonthlyBudget > 0 && (
             <View style={styles.heroTrack}>
               <View style={[styles.heroFill, { width: `${heroPct}%`, backgroundColor: heroOver ? t.spend : t.accent }]} />
             </View>
           )}
+          {totalMonthlyBudget > 0 && (
+            <Text style={[styles.heroLeft, { color: leftThisMonth >= 0 ? t.gain : t.spend }]}>
+              {leftThisMonth >= 0
+                ? `${peso(leftThisMonth, 0)} left · about ${peso(perDayLeft, 0)} a day for the next ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`
+                : `${peso(-leftThisMonth, 0)} over this month's budget`}
+            </Text>
+          )}
           <Text style={styles.heroWeek}>
-            This week ₱{totalWeekSpent.toFixed(0)}{totalWeeklyBudget > 0 ? ` of ₱${totalWeeklyBudget.toFixed(0)} budgeted` : ''}
+            This week {peso(totalWeekSpent, 0)}{totalWeeklyBudget > 0 ? ` of ${peso(totalWeeklyBudget, 0)} budgeted` : ''}
           </Text>
           {totalLastMonth > 0 && (
             <Text style={[styles.compareText, { color: spendDiff > 0 ? t.spend : spendDiff < 0 ? t.gain : t.inkDim }]}>{compareText}</Text>
@@ -121,10 +158,26 @@ export default function BudgetScreen({ categories, setCategories, transactions }
         })}
       </ScrollView>
 
+      <InsightsScreen visible={insightsOpen} onClose={() => setInsightsOpen(false)} transactions={transactions} categories={categories} />
+
       <Modal visible={!!limitModalCat} animationType="slide" transparent onRequestClose={() => setLimitModalCat(null)}>
         <View style={styles.overlay}>
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>{limitModalCat?.icon} {limitModalCat?.label} limits</Text>
+            {limitModalCat && usualMonthly(limitModalCat.id) > 0 && (() => {
+              const u = usualMonthly(limitModalCat.id);
+              return (
+                <TouchableOpacity style={styles.suggestBox} onPress={() => {
+                  haptic.tap();
+                  setMonthlyInput(String(roundNice(u)));
+                  setWeeklyInput(String(roundNice((u * 7) / 30)));
+                  setDailyInput(String(roundNice(u / 30)));
+                }}>
+                  <Text style={styles.suggestText}>You usually spend about <Text style={{ fontWeight: '700' }}>{peso(u, 0)}</Text> a month here.</Text>
+                  <Text style={styles.suggestAction}>Use as limits</Text>
+                </TouchableOpacity>
+              );
+            })()}
             <Text style={styles.fieldLabel}>Daily limit</Text>
             <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="e.g. 300" placeholderTextColor={t.inkFaint} value={dailyInput} onChangeText={setDailyInput} />
             <Text style={styles.fieldLabel}>Weekly limit (Sunday to Saturday)</Text>
@@ -143,7 +196,14 @@ export default function BudgetScreen({ categories, setCategories, transactions }
 const makeStyles = (t) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.bg },
   heroCard: { backgroundColor: t.surface2, borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 24 },
-  heroLabel: { color: t.inkDim, fontSize: 13, marginBottom: 6 },
+  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  heroLabel: { color: t.inkDim, fontSize: 13 },
+  insightsBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: t.accent, paddingVertical: 6, paddingHorizontal: 11, borderRadius: 14 },
+  insightsText: { color: t.onAccent, fontWeight: '700', fontSize: 12.5 },
+  heroLeft: { fontSize: 13, fontWeight: '600', marginTop: 10 },
+  suggestBox: { backgroundColor: t.accent + '1A', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: t.accent + '55' },
+  suggestText: { color: t.ink, fontSize: 13 },
+  suggestAction: { color: t.accent, fontWeight: '700', fontSize: 13, marginTop: 4 },
   heroAmt: { color: t.ink, fontSize: 30, fontWeight: '700', marginBottom: 12 },
   heroOf: { color: t.inkDim, fontSize: 14, fontWeight: '400' },
   heroTrack: { height: 9, backgroundColor: t.bg, borderRadius: 5, overflow: 'hidden' },

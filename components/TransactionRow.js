@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { findCategory } from './categories';
 import { formatLong } from './dateUtils';
 import { useTheme } from './theme';
+import { peso } from './format';
 
 export default function TransactionRow({ item, categories, onPress, showDate, warnings }) {
   const { theme: t } = useTheme();
@@ -22,7 +23,7 @@ export default function TransactionRow({ item, categories, onPress, showDate, wa
           <Text style={styles.warn}>⚠️ Over {warnings.join(' + ')} limit</Text>
         )}
       </View>
-      <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>{sign}₱{item.amount.toFixed(2)}</Text>
+      <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1}>{sign}{peso(item.amount, 2)}</Text>
     </TouchableOpacity>
   );
 }

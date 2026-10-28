@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'rea
 import CommitGoalModal from './CommitGoalModal';
 import { daysUntil } from './dateUtils';
 import { useTheme } from './theme';
+import { peso } from './format';
+import { goalIcon } from './goalStyle';
 
 // Shown after unlocking (and when the app comes back to the front) if any plan has reached its date.
 export default function DuePlansModal({ visible, goals, categories, onClose, onLater, onCommit }) {
@@ -22,9 +24,9 @@ export default function DuePlansModal({ visible, goals, categories, onClose, onL
               const d = daysUntil(g.dueDate);
               return (
                 <View key={g.id} style={styles.card}>
-                  <Text style={styles.name}>🎯 {g.label}</Text>
+                  <Text style={styles.name}>{goalIcon(g)} {g.label}</Text>
                   <Text style={[styles.due, d < 0 && { color: t.spend }]}>
-                    {d < 0 ? `Overdue by ${Math.abs(d)} day(s)` : 'Due today'}. ₱{g.savedAmount.toFixed(0)} of ₱{g.targetAmount.toFixed(0)} saved.
+                    {d < 0 ? `Overdue by ${Math.abs(d)} day(s)` : 'Due today'}. {peso(g.savedAmount, 0)} of {peso(g.targetAmount, 0)} saved.
                   </Text>
                   <View style={styles.btnRow}>
                     <TouchableOpacity style={styles.laterBtn} onPress={() => onLater(g)}>

@@ -5,6 +5,7 @@ import { findCategory } from './categories';
 import { sortByRecent } from './sortUtils';
 import { useTheme, readableOn } from './theme';
 import { useToday } from './useToday';
+import { peso } from './format';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -87,7 +88,7 @@ export default function RecurringManager({ categories, rules, setRules, openAddT
               <Text style={styles.name} numberOfLines={1}>{rule.note || cat.label}</Text>
             </View>
             <View style={styles.track}><View style={[styles.fill, { width: `${cycleProgress(rule, today)}%`, backgroundColor: color }]} /></View>
-            <Text style={styles.amt}>{sign}₱{rule.amount.toFixed(0)}</Text>
+            <Text style={styles.amt}>{sign}{peso(rule.amount, 0)}</Text>
           </TouchableOpacity>
         );
       })}

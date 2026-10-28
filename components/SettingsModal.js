@@ -1,17 +1,131 @@
-import { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
+import { useState, useMemo, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Modal, ScrollView, StyleSheet, Switch, Alert, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import ChangePinModal from './ChangePinModal';
 import { useTheme, THEMES, THEME_ORDER } from './theme';
+import { usePrefs } from './prefs';
+import { biometricAvailable, biometricUnlock } from './biometric';
+import { ensurePermission, sendTestNotification } from './notifications';
+import { exportBackup, pickBackup, restoreBackup, hasUndoRestore, undoRestore } from './backup';
+import { useToast } from './toast';
+import * as haptic from './haptics';
 
-export default function SettingsModal({ visible, onClose }) {
+const HOURS = [18, 19, 20, 21, 22];
+const hourLabel = (h) => `${((h + 11) % 12) + 1} ${h < 12 ? 'AM' : 'PM'}`;
+
+function daysAgo(iso) {
+  if (!iso) return null;
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
+}
+
+export default function SettingsModal({ visible, onClose, onDataRestored }) {
   const { theme: t, themeKey, setThemeKey } = useTheme();
+  const { prefs, setPref } = usePrefs();
+  const toast = useToast();
   const styles = useMemo(() => makeStyles(t), [t]);
   const [pinVisible, setPinVisible] = useState(false);
+  const [bio, setBio] = useState({ ok: false, label: 'Fingerprint' });
+  const [busy, setBusy] = useState(null);
+  const [canUndo, setCanUndo] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    biometricAvailable().then(setBio);
+    hasUndoRestore().then(setCanUndo);
+  }, [visible]);
 
   const options = [
     { key: 'system', name: 'Auto', preview: null },
     ...THEME_ORDER.map((k) => ({ key: k, name: THEMES[k].name, preview: THEMES[k] })),
   ];
+
+  const toggleBiometric = async (value) => {
+    if (!value) { setPref('biometric', false); return; }
+    if (!bio.ok) {
+      Alert.alert(`${bio.label} not set up`, bio.hardware ? 'Add a fingerprint in your phone settings first.' : 'This phone does not support it.');
+      return;
+    }
+    if (await biometricUnlock('Confirm to turn on')) { setPref('biometric', true); haptic.success(); }
+  };
+
+  const toggleNotify = async (key, value) => {
+    if (value && !(await ensurePermission(true))) {
+      Alert.alert('Notifications are blocked', 'Allow notifications for Ledger in your phone settings, then try again.');
+      return;
+    }
+    setPref(key, value);
+  };
+
+  const doExport = async () => {
+    setBusy('export');
+    try {
+      const s = await exportBackup();
+      setPref('lastBackupAt', new Date().toISOString());
+      toast.show(`Backup created: ${s.transactions} entries, ${s.plans} plans`);
+    } catch (e) {
+      Alert.alert('Backup failed', String(e.message || e));
+    } finally { setBusy(null); }
+  };
+
+  const doImport = async () => {
+    setBusy('import');
+    try {
+      const picked = await pickBackup();
+      if (!picked) return;
+      const { summary: s, payload } = picked;
+      const when = payload.exportedAt ? new Date(payload.exportedAt).toDateString() : 'an unknown date';
+      Alert.alert(
+        'Replace your current data?',
+        `This backup is from ${when}:\n• ${s.transactions} entries\n• ${s.tags} tags\n• ${s.plans} plans\n• ${s.recurring} recurring\n\nYour current data will be replaced. You can undo this right after from Settings.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Restore', style: 'destructive', onPress: async () => {
+            await restoreBackup(payload);
+            await onDataRestored?.();
+            setCanUndo(true);
+            haptic.success();
+            toast.show('Backup restored');
+          } },
+        ]
+      );
+    } catch (e) {
+      Alert.alert("Couldn't restore", String(e.message || e));
+    } finally { setBusy(null); }
+  };
+
+  const doUndoRestore = () => {
+    Alert.alert('Undo the last restore?', 'Your data goes back to how it was just before you restored.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Undo restore', onPress: async () => {
+        if (await undoRestore()) { await onDataRestored?.(); setCanUndo(false); toast.show('Restore undone'); }
+      } },
+    ]);
+  };
+
+  const Row = ({ icon, label, hint, value, onValueChange, disabled }) => (
+    <View style={[styles.row, disabled && { opacity: 0.5 }]}>
+      <Ionicons name={icon} size={20} color={t.accent} style={{ width: 26 }} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        {!!hint && <Text style={styles.rowHint}>{hint}</Text>}
+      </View>
+      <Switch value={!!value} disabled={disabled} onValueChange={onValueChange} trackColor={{ false: t.edge, true: t.accent }} thumbColor="#FFFFFF" />
+    </View>
+  );
+
+  const Button = ({ icon, label, hint, onPress, loading, danger }) => (
+    <TouchableOpacity style={styles.row} onPress={onPress} disabled={!!busy}>
+      <Ionicons name={icon} size={20} color={danger ? t.spend : t.accent} style={{ width: 26 }} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, danger && { color: t.spend }]}>{label}</Text>
+        {!!hint && <Text style={styles.rowHint}>{hint}</Text>}
+      </View>
+      {loading ? <ActivityIndicator color={t.accent} /> : <Ionicons name="chevron-forward" size={18} color={t.inkFaint} />}
+    </TouchableOpacity>
+  );
+
+  const backupAge = daysAgo(prefs.lastBackupAt);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -19,22 +133,23 @@ export default function SettingsModal({ visible, onClose }) {
         <View style={styles.sheet}>
           <View style={styles.head}>
             <Text style={styles.title}>Settings</Text>
-            <TouchableOpacity onPress={onClose}><Text style={styles.done}>Done</Text></TouchableOpacity>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}><Text style={styles.done}>Done</Text></TouchableOpacity>
           </View>
-          <ScrollView>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
             <Text style={styles.sectionLabel}>Appearance</Text>
             <View style={styles.grid}>
               {options.map((o) => (
-                <TouchableOpacity key={o.key} onPress={() => setThemeKey(o.key)}
+                <TouchableOpacity key={o.key} onPress={() => { haptic.tap(); setThemeKey(o.key); }}
                   style={[styles.themeCard, themeKey === o.key && styles.themeCardActive]}>
                   {o.preview ? (
-                    <View style={styles.dotsRow}>
-                      <View style={[styles.previewDot, { backgroundColor: o.preview.bg }]} />
-                      <View style={[styles.previewDot, { backgroundColor: o.preview.surface2 }]} />
-                      <View style={[styles.previewDot, { backgroundColor: o.preview.accent }]} />
+                    <View style={[styles.swatch, { backgroundColor: o.preview.bg, borderColor: o.preview.edge }]}>
+                      <View style={[styles.swatchBar, { backgroundColor: o.preview.surface2 }]} />
+                      <View style={[styles.swatchDot, { backgroundColor: o.preview.accent }]} />
                     </View>
                   ) : (
-                    <Text style={{ fontSize: 18, marginBottom: 6 }}>🌗</Text>
+                    <View style={[styles.swatch, { alignItems: 'center', justifyContent: 'center', borderColor: t.edge }]}>
+                      <Ionicons name="contrast-outline" size={22} color={t.ink} />
+                    </View>
                   )}
                   <Text style={styles.themeName}>{o.name}</Text>
                 </TouchableOpacity>
@@ -42,10 +157,59 @@ export default function SettingsModal({ visible, onClose }) {
             </View>
             <Text style={styles.hint}>Auto follows your phone's light/dark setting.</Text>
 
-            <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Security</Text>
-            <TouchableOpacity style={styles.rowBtn} onPress={() => setPinVisible(true)}>
-              <Text style={styles.rowBtnText}>Change PIN</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionLabel}>Security</Text>
+            <View style={styles.group}>
+              <Row icon="finger-print" label={`Unlock with ${bio.label.toLowerCase()}`} hint={bio.ok ? 'Your PIN still works too.' : 'Not set up on this phone.'}
+                value={prefs.biometric} onValueChange={toggleBiometric} />
+              <View style={styles.sep} />
+              <Button icon="keypad-outline" label="Change PIN" onPress={() => setPinVisible(true)} />
+            </View>
+            <Text style={styles.hint}>Ledger locks itself again after 2 minutes in the background.</Text>
+
+            <Text style={styles.sectionLabel}>Reminders</Text>
+            <View style={styles.group}>
+              <Row icon="flag-outline" label="Plans coming due" hint="9 AM the day before and on the day." value={prefs.notifyPlans} onValueChange={(v) => toggleNotify('notifyPlans', v)} />
+              <View style={styles.sep} />
+              <Row icon="repeat" label="Recurring entries" hint="9 AM on the day one is added." value={prefs.notifyRecurring} onValueChange={(v) => toggleNotify('notifyRecurring', v)} />
+              <View style={styles.sep} />
+              <Row icon="create-outline" label="Daily log nudge" hint="Skipped on days you've already logged." value={prefs.notifyDaily} onValueChange={(v) => toggleNotify('notifyDaily', v)} />
+              {prefs.notifyDaily && (
+                <View style={styles.hourRow}>
+                  {HOURS.map((h) => (
+                    <TouchableOpacity key={h} onPress={() => { setPref('dailyHour', h); setPref('dailyMinute', 0); }}
+                      style={[styles.hourChip, prefs.dailyHour === h && { backgroundColor: t.accent, borderColor: t.accent }]}>
+                      <Text style={{ color: prefs.dailyHour === h ? t.onAccent : t.ink, fontSize: 12.5 }}>{hourLabel(h)}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              <View style={styles.sep} />
+              <Button icon="notifications-outline" label="Send a test reminder" onPress={async () => {
+                if (await sendTestNotification()) toast.show('A test reminder will pop up in a moment');
+                else Alert.alert('Notifications are blocked', 'Allow notifications for Ledger in your phone settings.');
+              }} />
+            </View>
+
+            <Text style={styles.sectionLabel}>Backup</Text>
+            <View style={styles.group}>
+              <Button icon="cloud-upload-outline" label="Back up now"
+                hint={backupAge ? `Last backup ${backupAge}` : 'Never backed up. Your data only lives on this phone.'}
+                onPress={doExport} loading={busy === 'export'} />
+              <View style={styles.sep} />
+              <Button icon="cloud-download-outline" label="Restore from a backup" hint="Pick a ledger-backup .json file" onPress={doImport} loading={busy === 'import'} />
+              {canUndo && (<>
+                <View style={styles.sep} />
+                <Button icon="arrow-undo-outline" label="Undo last restore" onPress={doUndoRestore} danger />
+              </>)}
+            </View>
+            <Text style={styles.hint}>Save the file to Google Drive or email it to yourself. Your PIN is never included.</Text>
+
+            <Text style={styles.sectionLabel}>Feel</Text>
+            <View style={styles.group}>
+              <Row icon="pulse-outline" label="Vibration feedback" hint="Small taps when saving, deleting and unlocking." value={prefs.haptics} onValueChange={(v) => setPref('haptics', v)} />
+            </View>
+
+            <Text style={styles.footer}>Ledger · data stays on this phone</Text>
           </ScrollView>
           <ChangePinModal visible={pinVisible} onClose={() => setPinVisible(false)} />
         </View>
@@ -56,18 +220,25 @@ export default function SettingsModal({ visible, onClose }) {
 
 const makeStyles = (t) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22, maxHeight: '85%' },
-  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
-  title: { color: t.ink, fontSize: 18 },
+  sheet: { backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 20, paddingTop: 20, maxHeight: '92%' },
+  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  title: { color: t.ink, fontSize: 20, fontWeight: '700' },
   done: { color: t.accent, fontSize: 15, fontWeight: '600' },
-  sectionLabel: { color: t.inkDim, fontSize: 12.5, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionLabel: { color: t.inkDim, fontSize: 12, marginTop: 22, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  themeCard: { width: '31%', backgroundColor: t.surface2, borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
-  themeCardActive: { borderColor: t.accent },
-  dotsRow: { flexDirection: 'row', marginBottom: 8 },
-  previewDot: { width: 16, height: 16, borderRadius: 8, marginHorizontal: 2, borderWidth: 1, borderColor: t.inkFaint },
-  themeName: { color: t.ink, fontSize: 12.5 },
-  hint: { color: t.inkFaint, fontSize: 12, marginTop: 10 },
-  rowBtn: { backgroundColor: t.surface2, borderRadius: 12, padding: 14 },
-  rowBtnText: { color: t.ink, fontSize: 14.5 },
+  themeCard: { width: '22.5%', alignItems: 'center', paddingVertical: 8, borderRadius: 14, borderWidth: 2, borderColor: 'transparent' },
+  themeCardActive: { borderColor: t.accent, backgroundColor: t.surface2 },
+  swatch: { width: 48, height: 48, borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 6 },
+  swatchBar: { position: 'absolute', left: 6, right: 6, bottom: 8, height: 10, borderRadius: 4 },
+  swatchDot: { position: 'absolute', top: 7, right: 7, width: 14, height: 14, borderRadius: 7 },
+  themeName: { color: t.ink, fontSize: 12 },
+  hint: { color: t.inkFaint, fontSize: 12, marginTop: 8, lineHeight: 17 },
+  group: { backgroundColor: t.surface2, borderRadius: 16, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 14 },
+  rowLabel: { color: t.ink, fontSize: 14.5 },
+  rowHint: { color: t.inkDim, fontSize: 12, marginTop: 2 },
+  sep: { height: 1, backgroundColor: t.edge, marginLeft: 50 },
+  hourRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 14, paddingBottom: 12, paddingLeft: 50 },
+  hourChip: { paddingVertical: 6, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: t.edge },
+  footer: { color: t.inkFaint, fontSize: 12, textAlign: 'center', marginTop: 26 },
 });

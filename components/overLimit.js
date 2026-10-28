@@ -49,3 +49,20 @@ export function periodSpent(transactions, catId, kind, date) {
 export function limitFor(cat, kind) {
   return kind === 'daily' ? cat.dailyBudget : kind === 'weekly' ? cat.weeklyBudget : cat.budget;
 }
+
+// What limits did this new expense cross? Returns [{ kind, level: 'over' | 'near', spent, limit }]
+export function limitCrossings(transactionsAfter, categories, tx) {
+  if (tx.type !== 'expense') return [];
+  const cat = categories.find((c) => c.id === tx.category);
+  if (!cat) return [];
+  const out = [];
+  ['daily', 'weekly', 'monthly'].forEach((kind) => {
+    const limit = limitFor(cat, kind);
+    if (!(limit > 0)) return;
+    const after = periodSpent(transactionsAfter, tx.category, kind, tx.date);
+    const before = after - tx.amount;
+    if (before <= limit && after > limit) out.push({ kind, level: 'over', spent: after, limit });
+    else if (before < limit * 0.8 && after >= limit * 0.8 && after <= limit) out.push({ kind, level: 'near', spent: after, limit });
+  });
+  return out;
+}

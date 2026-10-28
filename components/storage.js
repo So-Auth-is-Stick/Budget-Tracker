@@ -2,13 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TX_KEY = 'budget_transactions';
 
-export async function updateTransaction(id, changes) {
-  const list = await loadTransactions();
-  const updated = list.map((t) => (t.id === id ? { ...t, ...changes } : t));
-  await saveTransactions(updated);
-  return updated;
-}
-
 export async function loadTransactions() {
   const raw = await AsyncStorage.getItem(TX_KEY);
   return raw ? JSON.parse(raw) : [];
@@ -32,9 +25,24 @@ export async function deleteTransaction(id) {
   return filtered;
 }
 
+export async function updateTransaction(id, changes) {
+  const list = await loadTransactions();
+  const updated = list.map((t) => (t.id === id ? { ...t, ...changes } : t));
+  await saveTransactions(updated);
+  return updated;
+}
+
 export async function addTransactions(newList) {
   const list = await loadTransactions();
   const merged = [...list, ...newList];
   await saveTransactions(merged);
   return merged;
+}
+
+// Moves every entry from one tag to another (used when a tag is deleted)
+export async function reassignCategory(fromId, toId) {
+  const list = await loadTransactions();
+  const updated = list.map((t) => (t.category === fromId ? { ...t, category: toId } : t));
+  await saveTransactions(updated);
+  return updated;
 }

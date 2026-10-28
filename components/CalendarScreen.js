@@ -2,18 +2,47 @@ import { useState, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { deleteTransaction, updateTransaction } from './storage';
+import { useTxActions } from './txActions';
 import TransactionRow from './TransactionRow';
 import TransactionDetailModal from './TransactionDetailModal';
 import GoalDetailModal from './GoalDetailModal';
 import { updateGoal, deleteGoal } from './goals';
 import { findCategory } from './categories';
 import { computeOverLimitFlags, periodSpent, limitFor } from './overLimit';
-import { getWeekRange, monthOf, daysUntil } from './dateUtils';
+import { getWeekRange, monthOf, daysUntil, formatLong } from './dateUtils';
 import { useToday } from './useToday';
 import { useTheme, readableOn } from './theme';
+import { peso, pesoShort } from './format';
+import { goalIcon } from './goalStyle';
 
 const GOAL_DOT = '#9C6ADE';
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// One calendar square: date, how much was spent (shaded by how heavy the day was) and small markers
+function DayCell({ date, state, marking = {}, onPress }) {
+  const { theme: t } = useTheme();
+  if (!date) return <View style={{ width: 46, height: 50 }} />;
+  const other = state === 'disabled';
+  const isToday = state === 'today';
+  const { spent = 0, heat = 0, earned, over, goal, focusColor, selected } = marking;
+  const bg = focusColor ? focusColor : spent > 0 ? t.spend + Math.round(0x14 + heat * 0x70).toString(16).padStart(2, '0') : 'transparent';
+  const textColor = focusColor ? readableOn(focusColor) : isToday ? t.accent : t.ink;
+  return (
+    <TouchableOpacity onPress={() => onPress && onPress(date)} activeOpacity={0.6}
+      style={{ width: 46, height: 50, borderRadius: 12, alignItems: 'center', paddingTop: 5, backgroundColor: bg, opacity: other ? 0.35 : 1,
+        borderWidth: selected || isToday ? 2 : 0, borderColor: selected ? t.accent : t.accent + '99' }}>
+      <Text style={{ color: textColor, fontSize: 14, fontWeight: isToday || selected ? '800' : '500' }}>{date.day}</Text>
+      <Text style={{ color: focusColor ? readableOn(focusColor) : t.inkDim, fontSize: 9.5, marginTop: 1 }} numberOfLines={1}>
+        {spent > 0 ? pesoShort(spent).replace('₱', '') : ''}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 2, marginTop: 1, height: 5 }}>
+        {earned && <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: t.gain }} />}
+        {over && <View style={{ width: 5, height: 5, borderRadius: 1, backgroundColor: t.accent, transform: [{ rotate: '45deg' }] }} />}
+        {goal && <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: GOAL_DOT }} />}
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function CalendarScreen({ categories, transactions, setTransactions, goals, setGoals, onCommitGoal }) {
   const { theme: t } = useTheme();
@@ -25,6 +54,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
   const [detailGoal, setDetailGoal] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [focusCat, setFocusCat] = useState(null); // tag whose spending dates are highlighted
+  const [viewMonth, setViewMonth] = useState(monthOf(today)); // month shown in the calendar
 
   // Which expenses pushed a tag past its daily / weekly / monthly limit
   const flags = useMemo(() => computeOverLimitFlags(transactions, categories), [transactions, categories]);
@@ -34,47 +64,47 @@ export default function CalendarScreen({ categories, transactions, setTransactio
   const weeklySpend = expenses.filter((tx) => tx.date >= start && tx.date <= end).reduce((s, tx) => s + tx.amount, 0);
   const dailySpend = selectedDate ? expenses.filter((tx) => tx.date === selectedDate).reduce((s, tx) => s + tx.amount, 0) : 0;
 
-  const summaryByDate = {};
-  transactions.forEach((tx) => {
-    const day = (summaryByDate[tx.date] = summaryByDate[tx.date] || { income: false, expense: false });
-    day[tx.type] = true;
-  });
-  const overLimitDates = {};
-  transactions.forEach((tx) => { if (flags[tx.id]) overLimitDates[tx.date] = true; });
-
   const goalsDueByDate = {};
   (goals || []).filter((g) => !g.committed && g.dueDate).forEach((g) => {
     (goalsDueByDate[g.dueDate] = goalsDueByDate[g.dueDate] || []).push(g);
   });
+  const overLimitDates = {};
+  transactions.forEach((tx) => { if (flags[tx.id]) overLimitDates[tx.date] = true; });
 
-  const marked = {};
-  new Set([...Object.keys(summaryByDate), ...Object.keys(goalsDueByDate)]).forEach((date) => {
-    const dots = [];
-    if (summaryByDate[date] && summaryByDate[date].income) dots.push({ key: 'in', color: t.gain });
-    if (summaryByDate[date] && summaryByDate[date].expense) dots.push({ key: 'out', color: t.spend });
-    if (overLimitDates[date]) dots.push({ key: 'warn', color: t.accent });
-    if (goalsDueByDate[date]) dots.push({ key: 'goal', color: GOAL_DOT });
-    marked[date] = { dots, marked: true };
-  });
   // Highlight every day this tag was spent on, in the tag's own colour
   const focusCategory = focusCat ? findCategory(categories, focusCat) : null;
-  const focusDates = focusCat
-    ? [...new Set(expenses.filter((tx) => tx.category === focusCat).map((tx) => tx.date))]
-    : [];
-  focusDates.forEach((date) => {
-    marked[date] = { ...(marked[date] || {}), selected: true, selectedColor: focusCategory.color, selectedTextColor: readableOn(focusCategory.color) };
-  });
-  if (selectedDate) {
-    marked[selectedDate] = { ...(marked[selectedDate] || {}), selected: true, selectedColor: t.accent };
-  }
+  const focusDates = focusCat ? [...new Set(expenses.filter((tx) => tx.category === focusCat).map((tx) => tx.date))] : [];
 
-  const currentMonth = monthOf(today);
+  const marked = useMemo(() => {
+    const m = {};
+    const get = (d) => (m[d] = m[d] || { spent: 0 });
+    transactions.forEach((tx) => {
+      const day = get(tx.date);
+      if (tx.type === 'expense') day.spent += tx.amount; else day.earned = true;
+    });
+    Object.keys(overLimitDates).forEach((d) => { get(d).over = true; });
+    Object.keys(goalsDueByDate).forEach((d) => { get(d).goal = true; });
+    // shade relative to the heaviest day of the month being viewed (ignoring one-off spikes above 2x the median)
+    const monthVals = Object.entries(m).filter(([d, v]) => d.slice(0, 7) === viewMonth && v.spent > 0).map(([, v]) => v.spent).sort((a, b) => a - b);
+    const median = monthVals.length ? monthVals[Math.floor(monthVals.length / 2)] : 1;
+    const cap = Math.max(1, Math.min(monthVals[monthVals.length - 1] || 1, median * 2));
+    Object.values(m).forEach((v) => { v.heat = Math.min(1, v.spent / cap); });
+    if (focusCategory) focusDates.forEach((d) => { get(d).focusColor = focusCategory.color; });
+    if (selectedDate) get(selectedDate).selected = true;
+    return m;
+  }, [transactions, flags, goals, focusCat, categories, selectedDate, viewMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const monthTx = transactions.filter((tx) => monthOf(tx.date) === viewMonth);
+  const monthSpent = monthTx.filter((tx) => tx.type === 'expense').reduce((s, tx) => s + tx.amount, 0);
+  const monthEarned = monthTx.filter((tx) => tx.type === 'income').reduce((s, tx) => s + tx.amount, 0);
   const monthByCat = {};
-  expenses.filter((tx) => monthOf(tx.date) === currentMonth).forEach((tx) => {
+  monthTx.filter((tx) => tx.type === 'expense').forEach((tx) => {
     monthByCat[tx.category] = (monthByCat[tx.category] || 0) + tx.amount;
   });
   const monthEntries = Object.entries(monthByCat).sort((a, b) => b[1] - a[1]);
   const monthMax = monthEntries.length ? monthEntries[0][1] : 0;
+  const monthName = MONTH_NAMES[Number(viewMonth.slice(5, 7)) - 1];
+  const focusInMonth = focusDates.filter((d) => monthOf(d) === viewMonth).length;
 
   const dayTransactions = selectedDate
     ? transactions.filter((tx) => tx.date === selectedDate).sort((a, b) => b.id - a.id)
@@ -101,8 +131,9 @@ export default function CalendarScreen({ categories, transactions, setTransactio
     });
   }
 
-  const handleDelete = async (id) => setTransactions(await deleteTransaction(id));
-  const handleEditSave = async (id, changes) => setTransactions(await updateTransaction(id, changes));
+  const txActions = useTxActions(categories, setTransactions);
+  const handleDelete = (id) => txActions.remove(id, transactions);
+  const handleEditSave = (id, changes) => txActions.edit(id, changes);
   const handleGoalAdjust = async (id, delta) => {
     const g = goals.find((x) => x.id === id);
     const updated = await updateGoal(id, { savedAmount: Math.max(0, g.savedAmount + delta) });
@@ -121,28 +152,47 @@ export default function CalendarScreen({ categories, transactions, setTransactio
     >
       <Calendar
         key={t.name}
-        markingType="multi-dot"
+        current={viewMonth + '-01'}
         markedDates={marked}
-        onDayPress={(day) => setSelectedDate(day.dateString)}
+        dayComponent={(p) => <DayCell {...p} onPress={(d) => setSelectedDate(d.dateString)} />}
+        onMonthChange={(m) => setViewMonth(m.dateString.slice(0, 7))}
+        enableSwipeMonths
         theme={{
           calendarBackground: t.bg, dayTextColor: t.ink, monthTextColor: t.ink, textDisabledColor: t.inkFaint,
           todayTextColor: t.accent, arrowColor: t.accent, textSectionTitleColor: t.inkDim,
-          selectedDayBackgroundColor: t.accent, selectedDayTextColor: t.onAccent,
+          textMonthFontWeight: '700', textMonthFontSize: 17,
         }}
-        style={{ marginBottom: 10 }}
+        style={{ marginBottom: 4 }}
       />
+      <View style={styles.legend}>
+        <View style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: t.spend + '80' }]} /><Text style={styles.legendText}>spent</Text></View>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: t.gain }]} /><Text style={styles.legendText}>earned</Text></View>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: t.accent, borderRadius: 1, transform: [{ rotate: '45deg' }] }]} /><Text style={styles.legendText}>over limit</Text></View>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: GOAL_DOT }]} /><Text style={styles.legendText}>plan due</Text></View>
+      </View>
+
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>{monthName} spent</Text>
+          <Text style={[styles.summaryVal, { color: t.spend }]} numberOfLines={1} adjustsFontSizeToFit>{peso(monthSpent, 0)}</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>{monthName} earned</Text>
+          <Text style={[styles.summaryVal, { color: t.gain }]} numberOfLines={1} adjustsFontSizeToFit>{peso(monthEarned, 0)}</Text>
+        </View>
+      </View>
       <View style={styles.weekStat}>
-        <Text style={styles.weekStatLabel}>This week ({start.slice(5)} to {end.slice(5)})</Text>
-        <Text style={styles.weekStatValue}>₱{weeklySpend.toFixed(2)}</Text>
+        <Text style={styles.weekStatLabel}>{selectedDate ? 'That week' : 'This week'} ({start.slice(5)} to {end.slice(5)})</Text>
+        <Text style={styles.weekStatValue}>{peso(weeklySpend, 2)}</Text>
       </View>
 
       <View style={styles.monthSection}>
-        <Text style={styles.sectionTitle}>This month by tag</Text>
+        <Text style={styles.sectionTitle}>{monthName} by tag</Text>
         {monthEntries.length > 0 && !focusCat && <Text style={styles.tapHint}>Tap a tag to see its days on the calendar</Text>}
         {focusCategory && (
           <View style={[styles.focusChip, { borderColor: focusCategory.color }]}>
             <Text style={styles.focusText} numberOfLines={1}>
-              {focusCategory.icon} {focusCategory.label} · {focusDates.length} {focusDates.length === 1 ? 'day' : 'days'} highlighted
+              {focusCategory.icon} {focusCategory.label} · {focusInMonth} {focusInMonth === 1 ? 'day' : 'days'} in {monthName}
             </Text>
             <TouchableOpacity onPress={() => setFocusCat(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={{ color: t.accent, fontWeight: '600', fontSize: 12.5 }}>Clear</Text>
@@ -150,7 +200,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
           </View>
         )}
         {monthEntries.length === 0 ? (
-          <Text style={styles.empty}>Nothing spent yet this month.</Text>
+          <Text style={styles.empty}>Nothing spent in {monthName}.</Text>
         ) : (
           monthEntries.map(([catId, amt]) => {
             const cat = findCategory(categories, catId);
@@ -164,7 +214,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
               >
                 <Text style={styles.barName} numberOfLines={1}>{cat.icon} {cat.label}</Text>
                 <View style={styles.barTrack}><View style={[styles.barFill, { width: `${pct}%`, backgroundColor: cat.color }]} /></View>
-                <Text style={styles.barAmt}>₱{amt.toFixed(0)}</Text>
+                <Text style={styles.barAmt}>{peso(amt, 0)}</Text>
               </TouchableOpacity>
             );
           })
@@ -176,8 +226,8 @@ export default function CalendarScreen({ categories, transactions, setTransactio
         <View style={styles.overlay}>
           <View style={styles.daySheet}>
             <View style={styles.dayHeader}>
-              <Text style={styles.dayLabel}>{selectedDate}</Text>
-              <Text style={styles.dayTotal}>{overLimitDates[selectedDate] ? '⚠️ ' : ''}Spent ₱{dailySpend.toFixed(2)}</Text>
+              <Text style={styles.dayLabel}>{selectedDate ? `${formatLong(selectedDate)}, ${selectedDate.slice(0, 4)}` : ''}</Text>
+              <Text style={styles.dayTotal}>{overLimitDates[selectedDate] ? '⚠️ ' : ''}Spent {peso(dailySpend, 2)}</Text>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -186,7 +236,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
                   <Text style={styles.alertTitle}>⚠️ Over budget</Text>
                   {dayAlerts.map((a) => (
                     <Text key={a.key} style={styles.alertLine}>
-                      {a.cat.icon} {a.cat.label}: ₱{a.spent.toFixed(0)} of ₱{a.limit.toFixed(0)} {a.kind} limit
+                      {a.cat.icon} {a.cat.label}: {peso(a.spent, 0)} of {peso(a.limit, 0)} {a.kind} limit
                     </Text>
                   ))}
                   <Text style={styles.alertHint}>Entries marked ⚠️ below are the ones that pushed it over.</Text>
@@ -200,7 +250,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
                     const remaining = daysUntil(g.dueDate);
                     return (
                       <TouchableOpacity key={g.id} style={styles.goalRow} onPress={() => setDetailGoal(g)}>
-                        <Text style={{ color: t.ink, fontSize: 14 }}>🎯 {g.label}</Text>
+                        <Text style={{ color: t.ink, fontSize: 14 }}>{goalIcon(g)} {g.label}</Text>
                         <Text style={[styles.goalDue, remaining < 0 && { color: t.spend }]}>
                           {remaining < 0 ? 'Overdue' : remaining === 0 ? 'Due today' : `${remaining}d left`}
                         </Text>
@@ -224,7 +274,8 @@ export default function CalendarScreen({ categories, transactions, setTransactio
               <Text style={{ color: t.inkDim, textAlign: 'center' }}>Close</Text>
             </TouchableOpacity>
 
-            <TransactionDetailModal visible={!!detailItem} item={detailItem} categories={categories} onClose={() => setDetailItem(null)} onDelete={handleDelete} onSave={handleEditSave} />
+            <TransactionDetailModal visible={!!detailItem} item={detailItem} categories={categories} onClose={() => setDetailItem(null)} onDelete={handleDelete} onSave={handleEditSave}
+        onDuplicate={(it) => txActions.add({ type: it.type, amount: it.amount, category: it.category, note: (it.note || '').replace(/ \(auto\)$/, ''), id: Date.now(), date: today })} />
             <GoalDetailModal
               visible={!!detailGoal}
               goal={detailGoal}
@@ -244,6 +295,15 @@ export default function CalendarScreen({ categories, transactions, setTransactio
 
 const makeStyles = (t) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.bg },
+  legend: { flexDirection: 'row', justifyContent: 'center', gap: 14, marginBottom: 14, flexWrap: 'wrap' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendSwatch: { width: 12, height: 12, borderRadius: 4 },
+  legendDot: { width: 7, height: 7, borderRadius: 4 },
+  legendText: { color: t.inkDim, fontSize: 11 },
+  summaryRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 12 },
+  summaryCard: { flex: 1, backgroundColor: t.surface, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14 },
+  summaryLabel: { color: t.inkDim, fontSize: 12, marginBottom: 2 },
+  summaryVal: { fontSize: 18, fontWeight: '800' },
   weekStat: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 18 },
   weekStatLabel: { color: t.inkDim, fontSize: 13 },
   weekStatValue: { color: t.spend, fontSize: 15, fontWeight: '600' },

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useTheme, readableOn } from './theme';
+import { peso } from './format';
 
 // Turns a plan into a real expense. Used from the plan's detail sheet and from the "Due now" prompt.
 export default function CommitGoalModal({ visible, goal, categories, onClose, onConfirm }) {
@@ -35,7 +36,7 @@ export default function CommitGoalModal({ visible, goal, categories, onClose, on
           <Text style={styles.title}>Commit: {goal.label}</Text>
           <Text style={styles.sub}>
             This records an expense for today
-            {goal.savedAmount > 0 ? ` and releases the ₱${goal.savedAmount.toFixed(0)} you set aside.` : '.'}
+            {goal.savedAmount > 0 ? ` and releases the ${peso(goal.savedAmount, 0)} you set aside.` : '.'}
           </Text>
 
           <Text style={styles.fieldLabel}>Amount paid</Text>

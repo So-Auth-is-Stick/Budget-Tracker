@@ -3,11 +3,16 @@ import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addGoal, updateGoal, deleteGoal, canCommit } from './goals';
 import DatePickerModal from './DatePickerModal';
-import GoalDetailModal from './GoalDetailModal';
+import GoalDetailModal, { GoalLookPicker } from './GoalDetailModal';
+import { goalIcon, goalColor } from './goalStyle';
+import { readableOn } from './theme';
+import * as haptic from './haptics';
 import RecurringManager from './RecurringManager';
 import { sortByRecent } from './sortUtils';
+import { formatLong } from './dateUtils';
 import { useToday } from './useToday';
 import { useTheme } from './theme';
+import { peso } from './format';
 
 export default function PlannerScreen({ categories, goals, setGoals, recurringRules, setRecurringRules, onCommitGoal }) {
   const { theme: t } = useTheme();
@@ -19,6 +24,8 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
   const [target, setTarget] = useState('');
   const [note, setNote] = useState('');
   const [dueDate, setDueDate] = useState(null);
+  const [newIcon, setNewIcon] = useState('🎯');
+  const [newColor, setNewColor] = useState(null);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [detailGoal, setDetailGoal] = useState(null);
   const [startCommit, setStartCommit] = useState(false);
@@ -29,13 +36,15 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
   const activeGoals = sortByRecent(goals.filter((g) => !g.committed));
   const doneGoals = sortByRecent(goals.filter((g) => g.committed), 'committedAt');
   const totalSaved = activeGoals.reduce((s, g) => s + g.savedAmount, 0);
+  const totalToGo = activeGoals.reduce((s, g) => s + Math.max(0, g.targetAmount - g.savedAmount), 0);
 
   const openDetail = (goal, commitFirst) => { setStartCommit(commitFirst); setDetailGoal(goal); };
-  const openAdd = () => { setLabel(''); setTarget(''); setNote(''); setDueDate(null); setAddVisible(true); };
+  const openAdd = () => { setLabel(''); setTarget(''); setNote(''); setDueDate(null); setNewIcon('🎯'); setNewColor(null); setAddVisible(true); };
   const saveNew = async () => {
     const tg = parseFloat(target);
     if (!label.trim() || !tg || tg <= 0) return;
-    setGoals(await addGoal({ id: 'goal_' + Date.now(), label: label.trim(), targetAmount: tg, savedAmount: 0, note: note.trim(), dueDate }));
+    setGoals(await addGoal({ id: 'goal_' + Date.now(), label: label.trim(), targetAmount: tg, savedAmount: 0, note: note.trim(), dueDate, icon: newIcon, ...(newColor ? { color: newColor } : {}) }));
+    haptic.success();
     setAddVisible(false);
   };
   const handleAdjust = async (id, delta) => {
@@ -54,7 +63,10 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
         <View style={styles.heroCard}>
           <View>
             <Text style={styles.heroLabel}>Total saved</Text>
-            <Text style={styles.heroAmt}>₱{totalSaved.toFixed(2)}</Text>
+            <Text style={styles.heroAmt}>{peso(totalSaved, 2)}</Text>
+            {activeGoals.length > 0 && (
+              <Text style={styles.heroSub}>{activeGoals.length} {activeGoals.length === 1 ? 'plan' : 'plans'}{totalToGo > 0 ? ` · ${peso(totalToGo, 0)} to go` : ' · all funded'}</Text>
+            )}
           </View>
           <TouchableOpacity style={styles.plusBtn} onPress={() => setMenuOpen((v) => !v)} accessibilityLabel="Add new">
             <Text style={styles.plusText}>{menuOpen ? '×' : '+'}</Text>
@@ -79,19 +91,20 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
         {activeGoals.map((g) => {
           const pct = Math.min(100, (g.savedAmount / g.targetAmount) * 100);
           const ready = canCommit(g, today);
+          const gc = goalColor(g, t);
           return (
-            <TouchableOpacity key={g.id} style={styles.card} onPress={() => openDetail(g, false)}>
+            <TouchableOpacity key={g.id} style={[styles.card, { backgroundColor: gc + '18', borderColor: gc + '55' }]} onPress={() => openDetail(g, false)}>
               <View style={styles.cardHeader}>
-                <View style={styles.iconCircle}><Text style={{ fontSize: 14 }}>🎯</Text></View>
+                <View style={[styles.iconCircle, { backgroundColor: gc + '35' }]}><Text style={{ fontSize: 14 }}>{goalIcon(g)}</Text></View>
                 <Text style={styles.name} numberOfLines={1}>{g.label}</Text>
                 {ready && (
-                  <TouchableOpacity style={styles.commitPill} onPress={() => openDetail(g, true)}>
-                    <Text style={styles.commitPillText}>Commit</Text>
+                  <TouchableOpacity style={[styles.commitPill, { backgroundColor: gc }]} onPress={() => openDetail(g, true)}>
+                    <Text style={[styles.commitPillText, { color: readableOn(gc) }]}>Commit</Text>
                   </TouchableOpacity>
                 )}
               </View>
-              <View style={styles.track}><View style={[styles.fill, { width: `${pct}%` }]} /></View>
-              <Text style={styles.amt}>₱{g.savedAmount.toFixed(0)} / ₱{g.targetAmount.toFixed(0)}</Text>
+              <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: gc }]} /></View>
+              <Text style={styles.amt}>{peso(g.savedAmount, 0)} / {peso(g.targetAmount, 0)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -102,7 +115,7 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
             {doneGoals.map((g) => (
               <TouchableOpacity key={g.id} style={styles.doneRow} onPress={() => openDetail(g, false)}>
                 <Text style={styles.doneName}>✅ {g.label}</Text>
-                <Text style={styles.doneAmt}>₱{(g.committedAmount ?? g.targetAmount).toFixed(0)}</Text>
+                <Text style={styles.doneAmt}>{peso((g.committedAmount ?? g.targetAmount), 0)}</Text>
               </TouchableOpacity>
             ))}
           </>
@@ -115,12 +128,13 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
       <Modal visible={addVisible} animationType="slide" transparent onRequestClose={() => setAddVisible(false)}>
         <View style={styles.overlay}>
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>New savings goal</Text>
+            <Text style={styles.sheetTitle}>New plan</Text>
+            <GoalLookPicker icon={newIcon} color={newColor || t.accent} onIcon={setNewIcon} onColor={setNewColor} />
             <TextInput style={styles.textField} placeholder="Name (e.g. Emergency fund, Rent)" placeholderTextColor={t.inkFaint} value={label} onChangeText={setLabel} />
             <TextInput style={styles.textField} keyboardType="decimal-pad" placeholder="Target amount" placeholderTextColor={t.inkFaint} value={target} onChangeText={setTarget} />
             <TextInput style={styles.textField} placeholder="Note (optional)" placeholderTextColor={t.inkFaint} value={note} onChangeText={setNote} />
             <TouchableOpacity style={styles.dateBtn} onPress={() => setDatePickerVisible(true)}>
-              <Text style={{ color: t.ink }}>{dueDate ? `Due ${dueDate}` : 'Set a due date (optional)'}</Text>
+              <Text style={{ color: t.ink }}>{dueDate ? `Due ${formatLong(dueDate)}, ${dueDate.slice(0, 4)}` : '📅  Set a due date (optional)'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveBtn} onPress={saveNew}><Text style={styles.saveText}>Save</Text></TouchableOpacity>
             <TouchableOpacity onPress={() => setAddVisible(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
@@ -156,7 +170,8 @@ const makeStyles = (t) => StyleSheet.create({
   menuText: { color: t.ink, fontSize: 14.5 },
   menuDivider: { height: 1, backgroundColor: t.edge },
   heroLabel: { color: t.inkDim, fontSize: 13, marginBottom: 6 },
-  heroAmt: { color: t.accent, fontSize: 30, fontWeight: '700' },
+  heroAmt: { color: t.accent, fontSize: 30, fontWeight: '800' },
+  heroSub: { color: t.inkDim, fontSize: 12.5, marginTop: 4 },
   sectionTitle: { color: t.inkDim, fontSize: 13, marginBottom: 10 },
   empty: { color: t.inkFaint, fontSize: 13, marginBottom: 10 },
   divider: { height: 1, backgroundColor: t.edge, marginVertical: 22 },
@@ -174,7 +189,7 @@ const makeStyles = (t) => StyleSheet.create({
   doneAmt: { color: t.inkDim, fontSize: 14 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 22 },
-  sheetTitle: { color: t.ink, fontSize: 16, marginBottom: 16 },
+  sheetTitle: { color: t.ink, fontSize: 18, fontWeight: '700', marginBottom: 14 },
   textField: { backgroundColor: t.surface2, borderRadius: 12, color: t.ink, padding: 12, fontSize: 14.5, marginBottom: 12 },
   dateBtn: { backgroundColor: t.surface2, borderRadius: 12, padding: 12, marginBottom: 16 },
   saveBtn: { backgroundColor: t.accent, padding: 14, borderRadius: 14, alignItems: 'center' },
