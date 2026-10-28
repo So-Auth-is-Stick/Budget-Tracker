@@ -1,7 +1,3 @@
-Claude
-
-
-Android build · YML
 # Builds the Android APK on GitHub's servers and signs it with the key EAS already holds
 # for your app, so it installs as an UPDATE over the old app (your data stays).
 #
