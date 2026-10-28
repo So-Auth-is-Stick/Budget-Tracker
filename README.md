@@ -1,4 +1,4 @@
-# Budget Tracker
+# Budget Tracker V2
 
 A personal, PIN-protected budgeting app built with React Native and Expo. All data stays on your device — nothing is sent to a server.
 
