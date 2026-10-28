@@ -1,3 +1,7 @@
+Claude
+
+
+Android build · YML
 # Builds the Android APK on GitHub's servers and signs it with the key EAS already holds
 # for your app, so it installs as an UPDATE over the old app (your data stays).
 #
@@ -7,7 +11,7 @@
 #
 # If this one keeps failing, use "Build Android APK (Expo cloud)" instead - same result, fewer moving parts.
 name: Build Android APK
-
+ 
 on:
   workflow_dispatch:          # the manual "Run workflow" button still works
   push:
@@ -16,42 +20,55 @@ on:
     paths-ignore:             # ...but not when only docs/screenshots changed
       - '**.md'
       - 'docs/**'
-
+ 
 # If you push again while a build is still running, cancel the old one and build the newest
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
-
+ 
 permissions:
   contents: write   # lets the job create a Release when you push a tag
-
+ 
 env:
   CI: "1"
   EAS_NO_VCS: "0"
-
+ 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned, so GitHub's switch to Ubuntu 26 can't break builds
     timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Get the code
+        uses: actions/checkout@v6
+ 
+      - name: Set up Node
+        uses: actions/setup-node@v6
         with:
           node-version: 22
-
-      - uses: actions/setup-java@v4
+ 
+      - name: Set up Java
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
-
-      - uses: android-actions/setup-android@v3
-
-      - uses: expo/expo-github-action@v8
+ 
+      # GitHub's Ubuntu machines already have the Android SDK installed, so no extra action is needed
+      # (that action is what failed before). Just accept the licences and make sure SDK 36 is there.
+      - name: Check the Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKM" ]; then echo "::error::Android SDK not found on this machine"; exit 1; fi
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          echo "Android SDK ready"
+ 
+      - name: Set up Expo / EAS (needs the EXPO_TOKEN secret)
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-
+ 
       # Plain-English checks, so a missing piece is named instead of hidden in a wall of log text.
       - name: Check the project is set up
         run: |
@@ -64,23 +81,30 @@ jobs:
           grep -q '"projectId"' app.json || fail 'app.json has no extra.eas.projectId. Run "eas init" once on your computer, then commit app.json.'
           node -v && npm -v
           eas whoami
-
+ 
       # `npm ci` stops if package-lock.json disagrees with package.json (yours still listed
       # drizzle, reanimated, sqlite... that were removed). `npm install` just repairs it.
       - name: Install packages
         run: npm install --no-audit --no-fund
-
+ 
       - name: Build the APK on this runner
         run: eas build --platform android --profile preview --local --non-interactive --output "$GITHUB_WORKSPACE/ledger.apk"
-
-      - uses: actions/upload-artifact@v4
+ 
+      - name: Save the APK (download it under Artifacts)
+        uses: actions/upload-artifact@v6
         with:
           name: ledger-apk
           path: ledger.apk
           if-no-files-found: error
-
+ 
       - name: Attach the APK to a GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         run: gh release create "$GITHUB_REF_NAME" ledger.apk --title "Ledger $GITHUB_REF_NAME" --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ 
+      - name: What to send if this failed
+        if: failure()
+        run: echo "::error::The build failed. Open the step above this one that has a red X and copy its last ~40 lines."
+ 
+Claude finished the response
