@@ -12,7 +12,7 @@ import { useToday } from './useToday';
 import { useTheme } from './theme';
 import { peso } from './format';
 
-export default function BudgetScreen({ categories, setCategories, transactions }) {
+export default function BudgetScreen({ categories, setCategories, transactions, goals = [] }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
@@ -158,7 +158,7 @@ export default function BudgetScreen({ categories, setCategories, transactions }
         })}
       </ScrollView>
 
-      <InsightsScreen visible={insightsOpen} onClose={() => setInsightsOpen(false)} transactions={transactions} categories={categories} />
+      <InsightsScreen visible={insightsOpen} onClose={() => setInsightsOpen(false)} transactions={transactions} categories={categories} goals={goals} />
 
       <Modal visible={!!limitModalCat} animationType="slide" transparent onRequestClose={() => setLimitModalCat(null)}>
         <View style={styles.overlay}>

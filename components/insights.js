@@ -69,6 +69,7 @@ export function observations(transactions, categories, month, today) {
   const prev = monthStats(transactions, prevMonthOf(month), today);
   const label = (id) => (categories.find((c) => c.id === id) || { label: id, icon: '◦' });
   const out = [];
+  const when = cur.isCurrent ? 'this month' : `in ${MONTHS[Number(month.slice(5, 7)) - 1]}`;
 
   if (cur.isCurrent && cur.daysElapsed >= 5 && prev.spent > 0) {
     const diff = cur.projected - prev.spent;
@@ -91,17 +92,17 @@ export function observations(transactions, categories, month, today) {
   movers.slice(0, 2).forEach((m) => {
     const up = m.diff > 0;
     out.push({ icon: m.c.icon, tone: up ? 'bad' : 'good',
-      text: `${m.c.label} is ${up ? 'up' : 'down'} ${Math.round(Math.abs(m.pct) * 100)}% compared with the same point last month.` });
+      text: cur.isCurrent ? `${m.c.label} is ${up ? 'up' : 'down'} ${Math.round(Math.abs(m.pct) * 100)}% compared with the same point last month.` : `${m.c.label} was ${up ? 'up' : 'down'} ${Math.round(Math.abs(m.pct) * 100)}% on the month before.` });
   });
 
   if (cur.savingsRate !== null && cur.earned > 0) {
     const r = Math.round(cur.savingsRate * 100);
     out.push({ icon: r >= 20 ? '💪' : r >= 0 ? '🙂' : '⚠️', tone: r >= 0 ? 'good' : 'bad',
-      text: r >= 0 ? `You've kept ${r}% of what you earned this month.` : `You've spent ${Math.abs(r)}% more than you earned this month.` });
+      text: r >= 0 ? `You kept ${r}% of what you earned ${when}.` : `You spent ${Math.abs(r)}% more than you earned ${when}.` });
   }
 
   if (cur.daysElapsed >= 7 && cur.noSpendDays > 0) {
-    out.push({ icon: '🌿', tone: 'good', text: `${cur.noSpendDays} no-spend ${cur.noSpendDays === 1 ? 'day' : 'days'} so far this month.` });
+    out.push({ icon: '🌿', tone: 'good', text: `${cur.noSpendDays} no-spend ${cur.noSpendDays === 1 ? 'day' : 'days'} ${cur.isCurrent ? 'so far this month' : when}.` });
   }
 
   const wk = weekdayPattern(transactions, today);
@@ -110,7 +111,7 @@ export function observations(transactions, categories, month, today) {
   const topCat = Object.entries(cur.byCat).sort((a, b) => b[1] - a[1])[0];
   if (topCat && cur.spent > 0) {
     const c = label(topCat[0]);
-    out.push({ icon: c.icon, tone: 'neutral', text: `${c.label} is ${Math.round((topCat[1] / cur.spent) * 100)}% of your spending this month.` });
+    out.push({ icon: c.icon, tone: 'neutral', text: `${c.label} ${cur.isCurrent ? 'is' : 'was'} ${Math.round((topCat[1] / cur.spent) * 100)}% of your spending ${when}.` });
   }
   return out.slice(0, 5);
 }
@@ -138,4 +139,65 @@ export function frequentEntries(transactions, type, today, limit = 4) {
   });
   return Object.values(counts).filter((c) => c.n >= 2)
     .sort((a, b) => b.n - a.n || b.last.localeCompare(a.last)).slice(0, limit);
+}
+
+// Longest run of consecutive days with at least one entry
+export function longestStreak(transactions) {
+  const days = [...new Set(transactions.map((tx) => tx.date))].sort();
+  let best = 0, run = 0, prev = null;
+  days.forEach((d) => {
+    run = prev && shiftDay(prev, 1) === d ? run + 1 : 1;
+    if (run > best) best = run;
+    prev = d;
+  });
+  return best;
+}
+
+// Small achievements to make the habit stick. Each: { id, icon, title, hint, earned }
+export function badges({ transactions = [], goals = [], categories = [], prefs = {}, today }) {
+  const exp = transactions.filter((tx) => tx.type === 'expense');
+  const days = new Set(transactions.map((tx) => tx.date));
+  const streak = longestStreak(transactions);
+  const monthsWith = [...new Set(exp.map((tx) => tx.date.slice(0, 7)))].sort().filter((m) => m < today.slice(0, 7));
+  const spentIn = (m) => exp.filter((tx) => tx.date.slice(0, 7) === m).reduce((s, tx) => s + tx.amount, 0);
+  let spentLess = false;
+  for (let i = 1; i < monthsWith.length; i++) if (prevMonthOf(monthsWith[i]) === monthsWith[i - 1] && spentIn(monthsWith[i]) < spentIn(monthsWith[i - 1])) spentLess = true;
+  const monthlyBudget = categories.filter((c) => c.type === 'expense').reduce((s, c) => s + (c.budget || 0), 0);
+  const underBudget = monthlyBudget > 0 && monthsWith.some((m) => spentIn(m) <= monthlyBudget);
+  // a no-spend day: a past day, after the first entry, with nothing spent
+  let noSpend = false;
+  if (transactions.length) {
+    const first = [...days].sort()[0];
+    const spentDays = new Set(exp.map((tx) => tx.date));
+    for (let d = first; d < today; d = shiftDay(d, 1)) { if (!spentDays.has(d)) { noSpend = true; break; } }
+  }
+  return [
+    { id: 'first', icon: '🌱', title: 'First step', hint: 'Log your first entry', earned: transactions.length > 0 },
+    { id: 'streak7', icon: '🔥', title: 'On a roll', hint: 'Log 7 days in a row', earned: streak >= 7 },
+    { id: 'streak30', icon: '☄️', title: 'Habit formed', hint: 'Log 30 days in a row', earned: streak >= 30 },
+    { id: 'nospend', icon: '🌿', title: 'No-spend day', hint: 'Get through a day without spending', earned: noSpend },
+    { id: 'funded', icon: '💰', title: 'Fully funded', hint: 'Fill a plan to its target', earned: goals.some((g) => g.savedAmount >= g.targetAmount && g.targetAmount > 0) || goals.some((g) => g.committed) },
+    { id: 'committed', icon: '🎯', title: 'Plan kept', hint: 'Commit a plan as an expense', earned: goals.some((g) => g.committed) },
+    { id: 'backup', icon: '🛡️', title: 'Safe and sound', hint: 'Make your first backup', earned: !!prefs.lastBackupAt },
+    { id: 'less', icon: '📉', title: 'Trimmed down', hint: 'Spend less than the month before', earned: spentLess },
+    { id: 'budget', icon: '✅', title: 'Within budget', hint: 'Finish a month under your monthly limits', earned: underBudget },
+    { id: 'hundred', icon: '💯', title: 'Century', hint: 'Log 100 entries', earned: transactions.length >= 100 },
+  ];
+}
+
+// Summary of the month that just ended (shown on Balance during the first days of a new month)
+export function lastMonthRecap(transactions, categories, today) {
+  const m = prevMonthOf(today.slice(0, 7));
+  const cur = monthStats(transactions, m, today);
+  if (cur.count === 0) return null;
+  const before = monthStats(transactions, prevMonthOf(m), today);
+  const top = Object.entries(cur.byCat).sort((a, b) => b[1] - a[1])[0];
+  const topCat = top ? categories.find((c) => c.id === top[0]) || { label: top[0], icon: '◦' } : null;
+  return {
+    month: m, spent: cur.spent, earned: cur.earned, net: cur.net,
+    keptPct: cur.earned > 0 ? Math.round((cur.net / cur.earned) * 100) : null,
+    changePct: before.spent > 0 ? Math.round(((cur.spent - before.spent) / before.spent) * 100) : null,
+    top: topCat ? { ...topCat, amount: top[1] } : null,
+    noSpendDays: cur.noSpendDays,
+  };
 }

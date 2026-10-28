@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './theme';
@@ -83,6 +83,7 @@ export default function PinScreen({ onUnlock }) {
     } else if (mode === 'confirm') {
       if (code === pendingPin) {
         await SecureStore.setItemAsync('ledger_pin', code);
+        setSavedPin(code);
         haptic.success();
         onUnlock();
       } else {
@@ -104,6 +105,20 @@ export default function PinScreen({ onUnlock }) {
         setTries(n);
         setMessage(`Wrong PIN · ${MAX_TRIES - n} ${MAX_TRIES - n === 1 ? 'try' : 'tries'} left`);
       }
+    }
+  };
+
+  // Fingerprint proves it's you, then you pick a new PIN. Without it there's no way back in (by design).
+  const forgotPin = async () => {
+    if (!(bio.ok && prefs.biometric)) {
+      Alert.alert('Forgot your PIN?', bio.hardware
+        ? 'Add a fingerprint to this phone and turn on "Unlock with fingerprint" in Ledger to be able to reset it. If you cannot get in, reinstalling erases the data. Restore it from your latest backup afterwards.'
+        : 'Your PIN protects your data, so it cannot be bypassed. If you reinstall the app the data is erased; restore it from your latest backup afterwards.');
+      return;
+    }
+    if (await biometricUnlock('Confirm it\'s you to set a new PIN')) {
+      haptic.success();
+      setMessage(''); setEntry(''); setPendingPin(''); setMode('setup');
     }
   };
 
@@ -149,12 +164,18 @@ export default function PinScreen({ onUnlock }) {
           );
         })}
       </View>
+      {mode === 'unlock' && (
+        <TouchableOpacity onPress={forgotPin} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={styles.forgot}>Forgot PIN?</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const KEY = 72;
 const makeStyles = (t) => StyleSheet.create({
+  forgot: { color: t.inkDim, fontSize: 13, textDecorationLine: 'underline' },
   container: { flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', gap: 22 },
   logo: { width: 64, height: 64, borderRadius: 20, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', marginBottom: 6, transform: [{ rotate: '-6deg' }] },
   logoText: { color: t.onAccent, fontSize: 34, fontWeight: '800' },

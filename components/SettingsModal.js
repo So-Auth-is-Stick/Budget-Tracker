@@ -6,7 +6,7 @@ import { useTheme, THEMES, THEME_ORDER } from './theme';
 import { usePrefs } from './prefs';
 import { biometricAvailable, biometricUnlock } from './biometric';
 import { ensurePermission, sendTestNotification } from './notifications';
-import { exportBackup, pickBackup, restoreBackup, hasUndoRestore, undoRestore } from './backup';
+import { exportBackup, pickBackup, restoreBackup, hasUndoRestore, undoRestore, exportCsv } from './backup';
 import { useToast } from './toast';
 import * as haptic from './haptics';
 
@@ -19,7 +19,7 @@ function daysAgo(iso) {
   return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
 }
 
-export default function SettingsModal({ visible, onClose, onDataRestored }) {
+export default function SettingsModal({ visible, onClose, onDataRestored, transactions = [], categories = [] }) {
   const { theme: t, themeKey, setThemeKey } = useTheme();
   const { prefs, setPref } = usePrefs();
   const toast = useToast();
@@ -197,6 +197,13 @@ export default function SettingsModal({ visible, onClose, onDataRestored }) {
                 onPress={doExport} loading={busy === 'export'} />
               <View style={styles.sep} />
               <Button icon="cloud-download-outline" label="Restore from a backup" hint="Pick a ledger-backup .json file" onPress={doImport} loading={busy === 'import'} />
+              <View style={styles.sep} />
+              <Button icon="grid-outline" label="Export as spreadsheet (.csv)" hint="Opens in Excel or Google Sheets" loading={busy === 'csv'} onPress={async () => {
+                setBusy('csv');
+                try { const n = await exportCsv(transactions, categories); toast.show(`Exported ${n} entries`); }
+                catch (e) { Alert.alert('Export failed', String(e.message || e)); }
+                finally { setBusy(null); }
+              }} />
               {canUndo && (<>
                 <View style={styles.sep} />
                 <Button icon="arrow-undo-outline" label="Undo last restore" onPress={doUndoRestore} danger />
@@ -204,9 +211,11 @@ export default function SettingsModal({ visible, onClose, onDataRestored }) {
             </View>
             <Text style={styles.hint}>Save the file to Google Drive or email it to yourself. Your PIN is never included.</Text>
 
-            <Text style={styles.sectionLabel}>Feel</Text>
+            <Text style={styles.sectionLabel}>Feel & privacy</Text>
             <View style={styles.group}>
               <Row icon="pulse-outline" label="Vibration feedback" hint="Small taps when saving, deleting and unlocking." value={prefs.haptics} onValueChange={(v) => setPref('haptics', v)} />
+              <View style={styles.sep} />
+              <Row icon="eye-off-outline" label="Hide amounts" hint="Shows ₱•••• everywhere. Also: tap the eye next to Balance." value={prefs.hideAmounts} onValueChange={(v) => setPref('hideAmounts', v)} />
             </View>
 
             <Text style={styles.footer}>Ledger · data stays on this phone</Text>

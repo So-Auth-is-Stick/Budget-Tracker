@@ -49,6 +49,7 @@ function Main() {
   const [goals, setGoals] = useState([]);
   const [recurringRules, setRecurringRules] = useState([]);
   const [addVisible, setAddVisible] = useState(false);
+  const [addDate, setAddDate] = useState(null); // pre-picked day when adding from the calendar
   const [dueOpen, setDueOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const backgroundedAt = useRef(null);
@@ -163,6 +164,7 @@ function Main() {
         <CalendarScreen
           categories={categories} transactions={transactions} setTransactions={setTransactions}
           goals={goals} setGoals={setGoals} onCommitGoal={handleCommit}
+          onAddForDate={(d) => { setAddDate(d); setAddVisible(true); }}
         />
       )}
       {tab === 'planner' && (
@@ -178,7 +180,7 @@ function Main() {
           if (tb.key === 'plus') {
             return (
               <View key="plus" style={styles.plusSlot}>
-                <TouchableOpacity style={styles.plusBtn} onPress={() => { haptic.bump(); setAddVisible(true); }} accessibilityLabel="Add transaction" activeOpacity={0.8}>
+                <TouchableOpacity style={styles.plusBtn} onPress={() => { haptic.bump(); setAddDate(null); setAddVisible(true); }} accessibilityLabel="Add transaction" activeOpacity={0.8}>
                   <Ionicons name="add" size={32} color={t.onAccent} />
                 </TouchableOpacity>
               </View>
@@ -198,7 +200,7 @@ function Main() {
         })}
       </View>
 
-      <AddTransactionSheet visible={addVisible} onClose={() => setAddVisible(false)} categories={categories} setCategories={setCategories} transactions={transactions} onSave={txActions.add} />
+      <AddTransactionSheet visible={addVisible} onClose={() => setAddVisible(false)} categories={categories} setCategories={setCategories} transactions={transactions} onSave={txActions.add} initialDate={addDate} />
       <DuePlansModal
         visible={dueOpen}
         goals={promptGoals}

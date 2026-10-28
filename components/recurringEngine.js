@@ -20,6 +20,23 @@ export function processRecurring(rules, today = todayStr()) {
         });
         rule.lastGeneratedPeriod = period;
       }
+    } else if (rule.frequency === 'semimonthly') {
+      // Twice a month: the 15th and the last day. Periods are keyed "YYYY-MM-A" / "YYYY-MM-B" so they sort in order.
+      const month = monthOf(today);
+      const [y, m] = month.split('-').map(Number);
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      [['A', 15], ['B', lastDay]].forEach(([half, day], k) => {
+        const key = `${month}-${half}`;
+        const scheduledDate = `${month}-${String(day).padStart(2, '0')}`;
+        if (scheduledDate > today) return;
+        if (rule.lastGeneratedPeriod && rule.lastGeneratedPeriod >= key) return;
+        newTx.push({
+          id: Date.now() + idx * 10 + k,
+          type: rule.type, amount: rule.amount, category: rule.category,
+          note: rule.note ? rule.note + ' (auto)' : 'Recurring', date: scheduledDate,
+        });
+        rule.lastGeneratedPeriod = key;
+      });
     } else if (rule.frequency === 'weekly') {
       const { start } = getWeekRange(today);
       if (rule.lastGeneratedPeriod === start) return;

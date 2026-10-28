@@ -18,9 +18,30 @@ function cycleProgress(rule, todayStr) {
     return ((7 - daysTo) / 7) * 100;
   }
   const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  if (rule.frequency === 'semimonthly') {
+    // half-month cycles: 1st..15th, 16th..end
+    return d <= 15 ? (d / 15) * 100 : ((d - 15) / (dim - 15)) * 100;
+  }
   const due = Math.min(rule.dayOfMonth || 1, dim);
   const daysTo = due >= d ? due - d : dim - d + due;
   return Math.max(0, Math.min(100, ((dim - daysTo) / dim) * 100));
+}
+
+export function currentPeriodKey(frequency, todayStr) {
+  const month = todayStr.slice(0, 7);
+  if (frequency === 'weekly') {
+    const d = new Date(todayStr + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+    return d.toISOString().slice(0, 10);
+  }
+  if (frequency === 'semimonthly') {
+    const [y, m, day] = todayStr.split('-').map(Number);
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    if (day >= last) return `${month}-B`;
+    if (day >= 15) return `${month}-A`;
+    const prev = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+    return `${prev}-B`;
+  }
+  return month;
 }
 
 export default function RecurringManager({ categories, rules, setRules, openAddToken }) {
@@ -60,7 +81,12 @@ export default function RecurringManager({ categories, rules, setRules, openAddT
       dayOfWeek: frequency === 'weekly' ? dayOfWeek : undefined,
       active: true,
     };
-    if (editingId) setRules(await updateRecurring(editingId, payload));
+    if (editingId) {
+      const before = rules.find((r) => r.id === editingId);
+      // switching how often it repeats: treat the current period as done so nothing is recorded twice
+      if (before && before.frequency !== frequency) payload.lastGeneratedPeriod = currentPeriodKey(frequency, today);
+      setRules(await updateRecurring(editingId, payload));
+    }
     else setRules(await addRecurring({ id: 'rec_' + Date.now(), lastGeneratedPeriod: null, ...payload }));
     setModalVisible(false);
   };
@@ -116,14 +142,15 @@ export default function RecurringManager({ categories, rules, setRules, openAddT
             <TextInput style={styles.input} keyboardType="decimal-pad" placeholder="Amount" placeholderTextColor={t.inkFaint} value={amount} onChangeText={setAmount} />
             <TextInput style={styles.textField} placeholder="Note (e.g. Rent, Netflix)" placeholderTextColor={t.inkFaint} value={note} onChangeText={setNote} />
             <View style={styles.typeRow}>
-              <TouchableOpacity style={[styles.typeBtn, frequency === 'monthly' && styles.typeBtnActive]} onPress={() => setFrequency('monthly')}>
-                <Text style={{ color: t.ink }}>Monthly</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.typeBtn, frequency === 'weekly' && styles.typeBtnActive]} onPress={() => setFrequency('weekly')}>
-                <Text style={{ color: t.ink }}>Weekly</Text>
-              </TouchableOpacity>
+              {[['monthly', 'Monthly'], ['semimonthly', 'Twice a month'], ['weekly', 'Weekly']].map(([k, l]) => (
+                <TouchableOpacity key={k} style={[styles.typeBtn, frequency === k && styles.typeBtnActive]} onPress={() => setFrequency(k)}>
+                  <Text style={{ color: t.ink, fontSize: 13 }}>{l}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            {frequency === 'monthly' ? (
+            {frequency === 'semimonthly' ? (
+              <Text style={[styles.fieldLabel, { marginBottom: 14 }]}>On the 15th and the last day of each month (like a semi-monthly payroll).</Text>
+            ) : frequency === 'monthly' ? (
               <>
                 <Text style={styles.fieldLabel}>Day of month (1–28)</Text>
                 <TextInput style={styles.textField} keyboardType="number-pad" value={dayOfMonth} onChangeText={setDayOfMonth} />

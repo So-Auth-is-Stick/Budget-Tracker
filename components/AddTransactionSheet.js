@@ -14,7 +14,7 @@ const shiftDay = (ds, n) => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function AddTransactionSheet({ visible, onClose, categories, transactions = [], onSave }) {
+export default function AddTransactionSheet({ visible, onClose, categories, transactions = [], onSave, initialDate }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const [type, setType] = useState('expense');
@@ -27,7 +27,7 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
 
   useEffect(() => {
     if (visible) {
-      setType('expense'); setCategoryId(null); setAmount(''); setNote(''); setDate(todayStr());
+      setType('expense'); setCategoryId(null); setAmount(''); setNote(''); setDate(initialDate && initialDate <= todayStr() ? initialDate : todayStr());
     }
   }, [visible]);
 

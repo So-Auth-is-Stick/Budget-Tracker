@@ -48,6 +48,12 @@ export function nextRecurringDate(rule, now = new Date()) {
     const d = new Date(today); d.setDate(d.getDate() + diff);
     return dateStrOf(d);
   }
+  if (rule.frequency === 'semimonthly') {
+    const end = (y, mo) => new Date(y, mo + 1, 0).getDate();
+    const y = today.getFullYear(), mo = today.getMonth();
+    const cands = [new Date(y, mo, 15), new Date(y, mo, end(y, mo)), new Date(y, mo + 1, 15)];
+    return dateStrOf(cands.find((c) => c >= today));
+  }
   const day = Math.min(rule.dayOfMonth || 1, 28);
   let d = new Date(today.getFullYear(), today.getMonth(), day);
   if (d < today) d = new Date(today.getFullYear(), today.getMonth() + 1, day);

@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { findCategory } from './categories';
 import { monthOf, prevMonthOf, formatLong } from './dateUtils';
-import { monthStats, weekdayPattern, observations, monthLabel, nextMonthOf } from './insights';
+import { monthStats, weekdayPattern, observations, monthLabel, nextMonthOf, badges } from './insights';
+import { usePrefs } from './prefs';
 import { peso, pesoShort } from './format';
 import { useToday } from './useToday';
 import { useTheme } from './theme';
@@ -12,13 +13,17 @@ import * as haptic from './haptics';
 
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function InsightsScreen({ visible, onClose, transactions, categories }) {
+export default function InsightsScreen({ visible, onClose, transactions, categories, goals = [], initialMonth }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
   const today = useToday();
   const [month, setMonth] = useState(monthOf(today));
   const [pickedDay, setPickedDay] = useState(null);
+  const { prefs } = usePrefs();
+  useEffect(() => { if (visible) { setMonth(initialMonth || monthOf(today)); setPickedDay(null); } }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  const badgeList = useMemo(() => badges({ transactions, goals, categories, prefs, today }), [transactions, goals, categories, prefs, today]);
+  const earnedCount = badgeList.filter((b) => b.earned).length;
 
   const firstMonth = useMemo(() => transactions.reduce((m, tx) => (tx.date.slice(0, 7) < m ? tx.date.slice(0, 7) : m), monthOf(today)), [transactions, today]);
   const cur = useMemo(() => monthStats(transactions, month, today), [transactions, month, today]);
@@ -198,6 +203,24 @@ export default function InsightsScreen({ visible, onClose, transactions, categor
             </View>
           )}
 
+          <View style={styles.card}>
+            <View style={styles.cardHeadRow}>
+              <Text style={styles.cardTitle}>Badges</Text>
+              <Text style={styles.cardMeta}>{earnedCount} of {badgeList.length}</Text>
+            </View>
+            <View style={styles.badgeGrid}>
+              {badgeList.map((b) => (
+                <View key={b.id} style={[styles.badge, !b.earned && { opacity: 0.38 }]}>
+                  <View style={[styles.badgeIcon, b.earned && { backgroundColor: t.accent + '2A', borderColor: t.accent }]}>
+                    <Text style={{ fontSize: 22 }}>{b.earned ? b.icon : '🔒'}</Text>
+                  </View>
+                  <Text style={styles.badgeTitle} numberOfLines={1}>{b.title}</Text>
+                  <Text style={styles.badgeHint} numberOfLines={2}>{b.hint}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
           {cur.count === 0 && <Text style={[styles.empty, { textAlign: 'center', marginTop: 20 }]}>Nothing recorded in {monthLabel(month)}.</Text>}
         </ScrollView>
       </View>
@@ -251,4 +274,9 @@ const makeStyles = (t) => StyleSheet.create({
   bigName: { color: t.ink, fontSize: 14 },
   bigMeta: { color: t.inkDim, fontSize: 11.5, marginTop: 2 },
   bigAmt: { color: t.spend, fontSize: 14, fontWeight: '700' },
+  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
+  badge: { width: '33.33%', alignItems: 'center', paddingHorizontal: 4 },
+  badgeIcon: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2, borderWidth: 1.5, borderColor: 'transparent', marginBottom: 6 },
+  badgeTitle: { color: t.ink, fontSize: 12, fontWeight: '700' },
+  badgeHint: { color: t.inkDim, fontSize: 10.5, textAlign: 'center', marginTop: 2 },
 });

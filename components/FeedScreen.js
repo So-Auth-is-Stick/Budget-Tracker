@@ -14,7 +14,8 @@ import { useToday } from './useToday';
 import { useTheme, readableOn } from './theme';
 import { usePrefs } from './prefs';
 import { peso, pesoShort } from './format';
-import { loggingStreak } from './insights';
+import { loggingStreak, lastMonthRecap, monthLabel } from './insights';
+import InsightsScreen from './InsightsScreen';
 import * as haptic from './haptics';
 
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -37,6 +38,7 @@ export default function FeedScreen({ categories, setCategories, transactions, se
   const [searchText, setSearchText] = useState('');
   const [activeFilterCat, setActiveFilterCat] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null); // tapped bar in the week chart
+  const [insightsMonth, setInsightsMonth] = useState(null);
 
   const sumOf = (list) => list.reduce((s, tx) => s + tx.amount, 0);
   const balance = sumOf(transactions.filter((tx) => tx.type === 'income')) - sumOf(transactions.filter((tx) => tx.type === 'expense'));
@@ -81,12 +83,19 @@ export default function FeedScreen({ categories, setCategories, transactions, se
   const nudgeSnoozed = prefs.backupNudgeAt && (Date.now() - new Date(prefs.backupNudgeAt).getTime()) / 864e5 < 14;
   const showBackupNudge = transactions.length >= 30 && backupAge > 30 && !nudgeSnoozed;
 
+  // First days of a new month: a recap of the one that just ended
+  const recap = useMemo(() => (Number(today.slice(8, 10)) <= 7 ? lastMonthRecap(transactions, categories, today) : null), [transactions, categories, today]);
+  const showRecap = recap && prefs.recapDismissed !== recap.month;
+
   const header = (
     <View>
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.greet}>{greeting()}</Text>
-          <Text style={styles.label}>Balance</Text>
+          <TouchableOpacity style={styles.labelRow} onPress={() => { haptic.tap(); setPref('hideAmounts', !prefs.hideAmounts); }} accessibilityLabel={prefs.hideAmounts ? 'Show amounts' : 'Hide amounts'}>
+            <Text style={styles.label}>Balance</Text>
+            <Ionicons name={prefs.hideAmounts ? 'eye-off-outline' : 'eye-outline'} size={15} color={t.inkFaint} />
+          </TouchableOpacity>
           <Text style={[styles.balance, balance < 0 && { color: t.spend }]} numberOfLines={1} adjustsFontSizeToFit>{peso(balance, 2)}</Text>
         </View>
         <View style={styles.iconCol}>
@@ -132,6 +141,35 @@ export default function FeedScreen({ categories, setCategories, transactions, se
           })}
         </View>
       </View>
+
+      {showRecap && (
+        <TouchableOpacity activeOpacity={0.85} style={styles.recap} onPress={() => setInsightsMonth(recap.month)}>
+          <View style={styles.recapHead}>
+            <Text style={styles.recapTitle}>🗓️ {monthLabel(recap.month).split(' ')[0]} recap</Text>
+            <TouchableOpacity onPress={() => setPref('recapDismissed', recap.month)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={18} color={t.inkFaint} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.recapRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.recapLabel}>Spent</Text>
+              <Text style={[styles.recapVal, { color: t.spend }]}>{peso(recap.spent, 0)}</Text>
+              {recap.changePct !== null && (
+                <Text style={[styles.recapSmall, { color: recap.changePct > 0 ? t.spend : t.gain }]}>{recap.changePct > 0 ? '▲' : '▼'} {Math.abs(recap.changePct)}% vs month before</Text>
+              )}
+            </View>
+            {recap.keptPct !== null && (
+              <View style={{ flex: 1 }}>
+                <Text style={styles.recapLabel}>Kept</Text>
+                <Text style={[styles.recapVal, { color: recap.keptPct >= 0 ? t.gain : t.spend }]}>{recap.keptPct}%</Text>
+                <Text style={styles.recapSmall}>of {peso(recap.earned, 0)} earned</Text>
+              </View>
+            )}
+          </View>
+          {recap.top && <Text style={styles.recapSmall}>Most went to {recap.top.icon} {recap.top.label} ({peso(recap.top.amount, 0)}){recap.noSpendDays > 0 ? ` · ${recap.noSpendDays} no-spend days` : ''}</Text>}
+          <Text style={styles.recapLink}>See the full month →</Text>
+        </TouchableOpacity>
+      )}
 
       {showBackupNudge && (
         <View style={styles.nudge}>
@@ -206,7 +244,8 @@ export default function FeedScreen({ categories, setCategories, transactions, se
 
       <TransactionDetailModal visible={!!detailItem} item={detailItem} categories={categories} onClose={() => setDetailItem(null)} onDelete={handleDelete} onSave={handleEditSave}
         onDuplicate={(it) => txActions.add({ type: it.type, amount: it.amount, category: it.category, note: (it.note || '').replace(/ \(auto\)$/, ''), id: Date.now(), date: today })} />
-      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} onDataRestored={onDataRestored} />
+      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} onDataRestored={onDataRestored} transactions={transactions} categories={categories} />
+      <InsightsScreen visible={!!insightsMonth} initialMonth={insightsMonth} onClose={() => setInsightsMonth(null)} transactions={transactions} categories={categories} goals={goals} />
     </View>
   );
 }
@@ -217,6 +256,7 @@ const makeStyles = (t) => StyleSheet.create({
   greet: { color: t.inkDim, fontSize: 13.5, marginBottom: 6 },
   iconCol: { flexDirection: 'row', gap: 10, paddingTop: 2 },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface2, alignItems: 'center', justifyContent: 'center' },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
   label: { color: t.inkFaint, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
   balance: { color: t.ink, fontSize: 42, fontWeight: '800', letterSpacing: -0.5 },
   statCards: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 12 },
@@ -233,6 +273,14 @@ const makeStyles = (t) => StyleSheet.create({
   barVal: { color: t.inkFaint, fontSize: 9.5, marginBottom: 3 },
   bar: { width: 18, borderRadius: 6 },
   barDay: { color: t.inkDim, fontSize: 11.5, marginTop: 5 },
+  recap: { marginHorizontal: 20, marginBottom: 12, padding: 14, borderRadius: 18, backgroundColor: t.surface, borderWidth: 1, borderColor: t.accent + '66' },
+  recapHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  recapTitle: { color: t.ink, fontSize: 15, fontWeight: '700' },
+  recapRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
+  recapLabel: { color: t.inkDim, fontSize: 12 },
+  recapVal: { fontSize: 20, fontWeight: '800', marginVertical: 2 },
+  recapSmall: { color: t.inkDim, fontSize: 12 },
+  recapLink: { color: t.accent, fontSize: 12.5, fontWeight: '700', marginTop: 8 },
   nudge: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 12, padding: 12, borderRadius: 14, backgroundColor: t.accent + '18', borderWidth: 1, borderColor: t.accent + '55' },
   nudgeText: { flex: 1, color: t.ink, fontSize: 12.5 },
   nudgeAction: { color: t.accent, fontWeight: '700', fontSize: 13 },

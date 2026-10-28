@@ -16,6 +16,12 @@ const NEEDED = [
   'expo-font',
 ];
 
+// New app icon + splash screen (files live in assets/ledger/)
+const SPLASH = ['expo-splash-screen', {
+  image: './assets/ledger/splash-icon.png', imageWidth: 170, resizeMode: 'contain',
+  backgroundColor: '#F3EFE4', dark: { image: './assets/ledger/splash-icon.png', backgroundColor: '#0F1A18' },
+}];
+
 expo.plugins = expo.plugins || [];
 const nameOf = (p) => (Array.isArray(p) ? p[0] : p);
 const have = new Set(expo.plugins.map(nameOf));
@@ -24,7 +30,26 @@ NEEDED.forEach((p) => {
   if (!have.has(nameOf(p))) { expo.plugins.push(p); added.push(nameOf(p)); }
 });
 
+// splash: add, or refresh its settings if it's already there
+const si = expo.plugins.findIndex((p) => nameOf(p) === 'expo-splash-screen');
+if (si === -1) { expo.plugins.push(SPLASH); added.push('expo-splash-screen'); } else { expo.plugins[si] = SPLASH; }
+
 const changes = [];
+if (fs.existsSync(path.join(__dirname, '..', 'assets', 'ledger', 'icon.png'))) {
+  expo.icon = './assets/ledger/icon.png';
+  expo.android = expo.android || {};
+  expo.android.adaptiveIcon = {
+    ...(expo.android.adaptiveIcon || {}),
+    foregroundImage: './assets/ledger/android-icon-foreground.png',
+    backgroundImage: './assets/ledger/android-icon-background.png',
+    monochromeImage: './assets/ledger/android-icon-monochrome.png',
+    backgroundColor: '#0F1A18',
+  };
+  expo.web = { ...(expo.web || {}), favicon: './assets/ledger/favicon.png' };
+  changes.push('icon + splash -> assets/ledger/');
+} else {
+  console.log('  (assets/ledger/ not found: skipped the new icon. Copy the assets folder from the zip and run again.)');
+}
 if (expo.userInterfaceStyle !== 'automatic') {
   changes.push(`userInterfaceStyle: "${expo.userInterfaceStyle || '(not set)'}" -> "automatic" (lets the Auto theme follow dark mode)`);
   expo.userInterfaceStyle = 'automatic';

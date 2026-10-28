@@ -1,6 +1,7 @@
 // App-wide settings (haptics, notifications, fingerprint...). Stored separately from your money data.
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setMasked } from './format';
 
 const PREFS_KEY = 'budget_prefs';
 
@@ -13,6 +14,9 @@ export const DEFAULT_PREFS = {
   dailyHour: 20,
   dailyMinute: 0,
   lastBackupAt: null,
+  hideAmounts: false,     // privacy: show ₱•••• instead of numbers
+  backupNudgeAt: null,
+  recapDismissed: null,
 };
 
 let current = { ...DEFAULT_PREFS };
@@ -39,6 +43,7 @@ export function PrefsProvider({ children }) {
     try { current = { ...DEFAULT_PREFS, ...(raw ? JSON.parse(raw) : {}) }; } catch (e) { current = { ...DEFAULT_PREFS }; }
     setPrefs(current);
   }, []);
+  setMasked(prefs.hideAmounts); // applied during render so every amount on screen follows it
   const value = useMemo(() => ({ prefs, setPref, reload }), [prefs, setPref, reload]);
   return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;
 }

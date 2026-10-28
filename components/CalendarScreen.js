@@ -44,7 +44,7 @@ function DayCell({ date, state, marking = {}, onPress }) {
   );
 }
 
-export default function CalendarScreen({ categories, transactions, setTransactions, goals, setGoals, onCommitGoal }) {
+export default function CalendarScreen({ categories, transactions, setTransactions, goals, setGoals, onCommitGoal, onAddForDate }) {
   const { theme: t } = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
@@ -270,7 +270,12 @@ export default function CalendarScreen({ categories, transactions, setTransactio
                   ))}
             </ScrollView>
 
-            <TouchableOpacity onPress={closeDaySheet} style={{ marginTop: 16 }}>
+            {onAddForDate && selectedDate <= today && (
+              <TouchableOpacity style={styles.addDayBtn} onPress={() => { const d = selectedDate; closeDaySheet(); setTimeout(() => onAddForDate(d), 350); }}>
+                <Text style={styles.addDayText}>+ Add an entry to this day</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={closeDaySheet} style={{ marginTop: 14 }}>
               <Text style={{ color: t.inkDim, textAlign: 'center' }}>Close</Text>
             </TouchableOpacity>
 
@@ -295,6 +300,8 @@ export default function CalendarScreen({ categories, transactions, setTransactio
 
 const makeStyles = (t) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.bg },
+  addDayBtn: { marginTop: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: t.accent, borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
+  addDayText: { color: t.accent, fontWeight: '700' },
   legend: { flexDirection: 'row', justifyContent: 'center', gap: 14, marginBottom: 14, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendSwatch: { width: 12, height: 12, borderRadius: 4 },

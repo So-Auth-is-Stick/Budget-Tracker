@@ -81,3 +81,26 @@ async function writeData(data) {
   if (sets.length) await AsyncStorage.multiSet(sets);
   if (removes.length) await AsyncStorage.multiRemove(removes);
 }
+
+// Spreadsheet-friendly copy of every entry (opens in Excel / Google Sheets)
+export function toCsv(transactions, categories) {
+  const esc = (v) => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const label = (id) => (categories.find((c) => c.id === id) || { label: id }).label;
+  const rows = [...transactions].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id).map((tx) => [
+    tx.date, tx.type === 'income' ? 'Earned' : 'Spent', label(tx.category), tx.note || '',
+    (tx.type === 'income' ? 1 : -1) * tx.amount,
+  ]);
+  return '﻿' + [['Date', 'Type', 'Tag', 'Description', 'Amount'], ...rows].map((r) => r.map(esc).join(',')).join('\r\n');
+}
+
+export async function exportCsv(transactions, categories) {
+  const file = new File(Paths.cache, `ledger-${todayStr()}.csv`);
+  if (file.exists) file.delete();
+  file.create();
+  file.write(toCsv(transactions, categories));
+  await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Export entries', UTI: 'public.comma-separated-values-text' });
+  return transactions.length;
+}
