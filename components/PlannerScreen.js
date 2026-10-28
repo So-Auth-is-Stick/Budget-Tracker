@@ -14,6 +14,7 @@ import { formatLong } from './dateUtils';
 import { useToday } from './useToday';
 import { useTheme } from './theme';
 import { peso } from './format';
+import { GrowBar } from './motion';
 
 export default function PlannerScreen({ categories, goals, setGoals, recurringRules, setRecurringRules, onCommitGoal }) {
   const { theme: t } = useTheme();
@@ -109,7 +110,7 @@ export default function PlannerScreen({ categories, goals, setGoals, recurringRu
                   </TouchableOpacity>
                 )}
               </View>
-              <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: gc }]} /></View>
+              <View style={styles.track}><GrowBar pct={pct} style={[styles.fill, { backgroundColor: gc }]} /></View>
               <Text style={styles.amt}>{peso(g.savedAmount, 0)} / {peso(g.targetAmount, 0)}</Text>
             </TouchableOpacity>
           );

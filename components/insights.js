@@ -201,3 +201,18 @@ export function lastMonthRecap(transactions, categories, today) {
     noSpendDays: cur.noSpendDays,
   };
 }
+
+// Spent / earned for the `n` months ending at `endMonth` (oldest first)
+export function monthsTrend(transactions, endMonth, n = 6) {
+  const months = [];
+  let m = endMonth;
+  for (let i = 0; i < n; i++) { months.unshift(m); m = prevMonthOf(m); }
+  const rows = months.map((month) => ({ month, spent: 0, earned: 0 }));
+  const idx = Object.fromEntries(months.map((mm, i) => [mm, i]));
+  transactions.forEach((tx) => {
+    const i = idx[tx.date.slice(0, 7)];
+    if (i === undefined) return;
+    if (tx.type === 'expense') rows[i].spent += tx.amount; else rows[i].earned += tx.amount;
+  });
+  return rows;
+}

@@ -14,6 +14,7 @@ import { useToday } from './useToday';
 import { useTheme, readableOn } from './theme';
 import { peso, pesoShort } from './format';
 import { goalIcon } from './goalStyle';
+import { GrowBar } from './motion';
 
 const GOAL_DOT = '#9C6ADE';
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -213,7 +214,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
                 onPress={() => setFocusCat(focusCat === catId ? null : catId)}
               >
                 <Text style={styles.barName} numberOfLines={1}>{cat.icon} {cat.label}</Text>
-                <View style={styles.barTrack}><View style={[styles.barFill, { width: `${pct}%`, backgroundColor: cat.color }]} /></View>
+                <View style={styles.barTrack}><GrowBar pct={pct} style={[styles.barFill, { backgroundColor: cat.color }]} /></View>
                 <Text style={styles.barAmt}>{peso(amt, 0)}</Text>
               </TouchableOpacity>
             );

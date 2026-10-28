@@ -26,6 +26,7 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
   const [date, setDate] = useState(todayStr());
   const [pickerVisible, setPickerVisible] = useState(false);
   const [noteFocused, setNoteFocused] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { accounts } = useAccounts();
   const { prefs, setPref } = usePrefs();
   const [accountId, setAccountId] = useState(null);
@@ -33,6 +34,7 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
   useEffect(() => {
     if (visible) {
       setAccountId(accounts.some((a) => a.id === prefs.lastAccount) ? prefs.lastAccount : defaultAccountId(accounts) || null);
+      setSaving(false);
       setType('expense'); setCategoryId(null); setAmount(''); setNote(''); setDate(initialDate && initialDate <= todayStr() ? initialDate : todayStr());
     }
   }, [visible]);
@@ -91,6 +93,8 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
 
   const save = async () => {
     if (!valid) { haptic.warning(); return; }
+    if (saving) return; // ignore a double tap
+    setSaving(true);
     const acc = accounts.length > 1 && accountId ? { account: accountId } : {};
     if (acc.account) setPref('lastAccount', acc.account);
     await onSave({ id: Date.now(), type, amount: Math.round(value * 100) / 100, category: categoryId, note: note.trim(), date, ...acc });

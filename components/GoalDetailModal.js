@@ -9,6 +9,7 @@ import { GOAL_ICONS, GOAL_COLORS, goalIcon, goalColor, savingPace } from './goal
 import { useTheme, readableOn } from './theme';
 import { peso } from './format';
 import * as haptic from './haptics';
+import { GrowBar } from './motion';
 
 const QUICK = [100, 500, 1000];
 
@@ -153,7 +154,7 @@ export default function GoalDetailModal({ visible, goal, categories = [], startC
                 </View>
 
                 <Text style={[styles.amt, { color: gc }]}>{peso(goal.savedAmount, 0)} <Text style={styles.amtOf}>of {peso(goal.targetAmount, 0)}</Text></Text>
-                <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: gc }]} /></View>
+                <View style={styles.track}><GrowBar pct={pct} style={[styles.fill, { backgroundColor: gc }]} /></View>
                 <View style={styles.pctRow}>
                   <Text style={styles.pctText}>{Math.floor(pct)}%</Text>
                   {!funded && <Text style={styles.pctText}>{peso(goal.targetAmount - goal.savedAmount, 0)} to go</Text>}

@@ -1,90 +1,95 @@
-# Budget Tracker V2
+# Ledger
 
-A personal, PIN-protected budgeting app built with React Native and Expo. All data stays on your device — nothing is sent to a server.
+A personal, PIN-protected budgeting app for Android, built with React Native and Expo.
+Everything stays on your phone: no account, no server, no ads.
 
-## Features
+![Ledger screens](docs/hero.png)
 
-- **PIN lock** — 4-digit PIN set on first launch, required every time the app opens. Stored securely on-device with `expo-secure-store`.
-- **Balance tracking** — log income and expenses, see your running balance, today's spending, and a "safe to spend" number that accounts for money set aside in savings.
-- **Custom tags** — fully editable categories for both income and expenses, each with its own emoji and color.
-- **Calendar view** — a month grid with color-coded dots for income, spending, and budget warnings. Tap any date to see what happened that day, including upcoming goal due dates.
-- **Spending limits** — set daily and/or monthly limits per tag, with progress bars and over-limit warnings.
-- **Savings & Planner** — savings goals with optional due dates, add/withdraw funds, plus recurring transactions (rent, subscriptions, etc.) that auto-generate on schedule.
-- **Search & filter** — find past transactions by description or tag, on both the Balance and Calendar screens.
-- **Themes** — six color themes plus an Auto mode that follows your phone's light/dark setting.
-- **Edit & delete** — every transaction and goal can be edited or removed after the fact, with confirmation before deleting.
+## What it does
 
-## Tech stack
+**Log money fast**
+- One-tap **+** button with *Quick add* shortcuts that learn what you log often, tags sorted by how much you use them, description suggestions, and Today / Yesterday buttons.
+- A live hint while you type ("₱120 left for Food today"), a warning when an entry pushes a tag over its limit, and **Undo** after every save or delete.
+- Optional **accounts** (Cash, GCash, Maya, Bank…) with per-account balances and *Move money* between them.
 
-- [Expo](https://expo.dev) (React Native)
-- `expo-secure-store` — encrypted PIN storage
-- `@react-native-async-storage/async-storage` — local data storage
-- `react-native-calendars` — calendar UI
-- `react-native-safe-area-context` — safe-area-aware layouts
+**See where it goes**
+- **Balance**: balance, spent today, *safe to spend* (minus money set aside for plans), this week's spending chart, and a logging streak 🔥.
+- **Calendar heat map**: every day shows what you spent, shaded by how heavy it was. Tap a tag to highlight the days you spent on it.
+- **Insights**: earned / spent / kept, plain-English observations, day-by-day chart with a month-end projection, spending by tag vs last month, your heaviest weekday, biggest expenses, a 6-month trend, and **badges**.
+- **Budgets**: daily, weekly and monthly limits per tag, "about ₱X a day left this month", and suggested limits based on what you usually spend.
 
-## Getting started
+**Plan ahead**
+- **Plans** for savings and upcoming payments, each with its own icon and colour, due dates, a "set aside ₱X a day" pace and one-tap top-ups. Commit a plan to record it as an expense.
+- **Recurring entries**: monthly, weekly, or **twice a month** (15th + month end).
+- **Lent & borrowed**: keep track of utang both ways, with partial pay-backs.
+- **Reminders** for plans coming due and recurring entries, plus an optional evening "log today?" nudge.
 
-### Prerequisites
+**Safe and private**
+- 4-digit PIN (stored in encrypted secure storage), optional **fingerprint unlock**, lockout after 5 wrong tries, auto-lock after 2 minutes in the background, and a *hide amounts* eye.
+- **Backup & restore** to a single file (save it to Google Drive or email), and **export to CSV** for Excel / Google Sheets.
+- Six themes plus Auto (follows the phone's dark mode).
 
-- [Node.js](https://nodejs.org) (LTS version)
-- The [Expo Go](https://expo.dev/go) app on your phone, for development
+| | | |
+|---|---|---|
+| ![Balance](docs/balance.png) | ![Add](docs/add.png) | ![Calendar](docs/calendar.png) |
+| ![Insights](docs/insights.png) | ![Planner](docs/planner.png) | ![Settings](docs/settings.png) |
 
-### Installation
+## Install (Android)
+
+Download the latest `.apk` from the [Releases](../../releases) page and open it on your phone.
+Android will ask you to allow installing from this source the first time.
+
+**Updating:** install the new APK *over* the old one. Don't uninstall first, or your data is erased.
+Make a backup first anyway (Settings → Back up now).
+
+## Develop
 
 ```bash
-git clone https://github.com/yourusername/ledger.git
-cd ledger
 npm install
-npx expo start
+npx expo start          # scan the QR code with Expo Go
 ```
 
-Scan the QR code that appears with Expo Go (Android) or your Camera app (iOS) to run it on your phone.
-
-## Building a standalone app
-
-This project uses [EAS Build](https://docs.expo.dev/build/introduction/) to produce installable apps outside of Expo Go.
+Build an installable APK with [EAS Build](https://docs.expo.dev/build/introduction/):
 
 ```bash
 npm install -g eas-cli
 eas login
-eas build:configure
-eas build --platform android --profile preview   # installable .apk
-eas build --platform ios --profile preview        # requires a paid Apple Developer account to install on a physical iPhone
+eas build --platform android --profile preview
 ```
+
+Or use GitHub → **Actions** → *Build Android APK* (needs an `EXPO_TOKEN` repository secret).
+Pushing a tag like `v2.0.0` builds the APK and attaches it to a GitHub Release.
 
 ## Project structure
 
 ```
-Ledger/
-  App.js                  # Entry point, tab navigation, theme + data loading
-  components/
-    PinScreen.js           # PIN setup / unlock
-    FeedScreen.js           # Balance screen
-    CalendarScreen.js       # Calendar screen
-    BudgetScreen.js          # Spending limits screen
-    PlannerScreen.js         # Savings goals + recurring transactions
-    SettingsModal.js         # Theme picker, Change PIN
-    ChangePinModal.js
-    CategoryManager.js       # Tag CRUD
-    ColorPicker.js
-    TransactionRow.js
-    TransactionDetailModal.js
-    GoalDetailModal.js
-    RecurringManager.js
-    DatePickerModal.js
-    theme.js                 # Theme definitions + context
-    storage.js                # Transaction persistence
-    categories.js             # Category persistence
-    goals.js                  # Savings goal persistence
-    recurring.js                # Recurring rule persistence
-    recurringEngine.js           # Recurring rule processing logic
-    dateUtils.js                  # Date helpers
+App.js                    entry point: providers, tab bar, data loading, reminders
+components/
+  FeedScreen.js           Balance screen
+  CalendarScreen.js       calendar heat map + day sheet
+  BudgetScreen.js         spending limits
+  InsightsScreen.js       insights, trends, badges
+  PlannerScreen.js        plans, recurring entries, lent & borrowed
+  AddTransactionSheet.js  the + sheet
+  SettingsModal.js        themes, security, reminders, backup, accounts
+  PinScreen.js · WelcomeFlow.js
+  accounts.js · AccountsUI.js   optional accounts + transfers
+  iou.js · IouManager.js        lent & borrowed
+  backup.js               backup / restore / CSV
+  notifications.js        local reminders
+  insights.js             pure calculations behind Insights, badges, streaks
+  overLimit.js            limit checks
+  recurringEngine.js      creates recurring entries when due
+  storage.js · categories.js · goals.js · recurring.js   persistence
+  theme.js · prefs.js · toast.js · haptics.js · format.js · dateUtils.js
+scripts/update-app-json.js      one-time app.json helper for the v2 update
 ```
 
 ## Data & privacy
 
-All data (transactions, tags, budgets, goals, recurring rules) is stored locally on-device using AsyncStorage. The PIN is stored separately in encrypted secure storage. Nothing leaves the device — there is no backend, account system, or analytics.
+All data lives on the device in AsyncStorage; the PIN is kept separately in encrypted secure storage.
+Nothing is sent anywhere. Backups only go where you choose to save the file.
 
 ## License
 
-MIT License.
+Personal project. Add a license (e.g. MIT) here if you'd like to share the source code publicly.

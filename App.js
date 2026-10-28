@@ -18,9 +18,10 @@ import { AccountsProvider, useAccounts } from './components/accounts';
 import { loadCategories } from './components/categories';
 import { loadTransactions, addTransaction, addTransactions } from './components/storage';
 import { loadGoals, updateGoal } from './components/goals';
-import { loadRecurring, saveRecurring } from './components/recurring';
+import { loadRecurring, saveRecurring, REC_KEY } from './components/recurring';
+import { serial } from './components/serial';
 import { processRecurring } from './components/recurringEngine';
-import { syncReminders } from './components/notifications';
+import { syncReminders, ensurePermission } from './components/notifications';
 import { useTxActions } from './components/txActions';
 import { todayStr } from './components/dateUtils';
 import { useToday } from './components/useToday';
@@ -59,7 +60,7 @@ function Main() {
   const pendingNote = useRef(null); // message to show once the PIN screen is gone
 
   // Creates any recurring transactions that have come due. Safe to run repeatedly.
-  const runRecurring = useCallback(async () => {
+  const runRecurring = useCallback(() => serial(REC_KEY, async () => {
     const rules = await loadRecurring();
     const { newTx, updatedRules } = processRecurring(rules);
     if (newTx.length > 0) {
@@ -68,7 +69,7 @@ function Main() {
       setRecurringRules(updatedRules);
       pendingNote.current = newTx.length === 1 ? '🔁 Added 1 recurring entry' : `🔁 Added ${newTx.length} recurring entries`;
     }
-  }, []);
+  }), []);
 
   useEffect(() => {
     if (unlocked && pendingNote.current) {
@@ -106,6 +107,17 @@ function Main() {
     });
     return () => sub.remove();
   }, [runRecurring]);
+
+  // Ask for notification permission once, the first time there's something to remind about
+  useEffect(() => {
+    if (!loaded || !unlocked || prefs.askedNotif) return;
+    const hasDuePlan = goals.some((g) => !g.committed && g.dueDate);
+    const hasRule = recurringRules.some((r) => r.active);
+    if ((hasDuePlan && prefs.notifyPlans) || (hasRule && prefs.notifyRecurring)) {
+      setPref('askedNotif', true);
+      ensurePermission(true).then(() => syncReminders({ goals, rules: recurringRules, categories, transactions, prefs }));
+    }
+  }, [loaded, unlocked, goals, recurringRules, prefs.askedNotif]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep scheduled reminders in step with the data (a short pause so typing doesn't reschedule constantly)
   useEffect(() => {

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { serial } from './serial';
 
 const CATS_KEY = 'budget_categories';
 
@@ -22,25 +23,31 @@ export async function saveCategories(list) {
   await AsyncStorage.setItem(CATS_KEY, JSON.stringify(list));
 }
 
-export async function addCategory(cat) {
-  const list = await loadCategories();
-  list.push(cat);
-  await saveCategories(list);
-  return list;
+export function addCategory(cat) {
+  return serial(CATS_KEY, async () => {
+    const list = await loadCategories();
+    list.push(cat);
+    await saveCategories(list);
+    return list;
+  });
 }
 
-export async function updateCategory(id, changes) {
-  const list = await loadCategories();
-  const updated = list.map((c) => (c.id === id ? { ...c, ...changes } : c));
-  await saveCategories(updated);
-  return updated;
+export function updateCategory(id, changes) {
+  return serial(CATS_KEY, async () => {
+    const list = await loadCategories();
+    const updated = list.map((c) => (c.id === id ? { ...c, ...changes } : c));
+    await saveCategories(updated);
+    return updated;
+  });
 }
 
-export async function deleteCategory(id) {
-  const list = await loadCategories();
-  const filtered = list.filter((c) => c.id !== id);
-  await saveCategories(filtered);
-  return filtered;
+export function deleteCategory(id) {
+  return serial(CATS_KEY, async () => {
+    const list = await loadCategories();
+    const filtered = list.filter((c) => c.id !== id);
+    await saveCategories(filtered);
+    return filtered;
+  });
 }
 
 export function findCategory(categories, id) {

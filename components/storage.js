@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { serial } from './serial';
 
 const TX_KEY = 'budget_transactions';
 
@@ -11,50 +12,62 @@ export async function saveTransactions(list) {
   await AsyncStorage.setItem(TX_KEY, JSON.stringify(list));
 }
 
-export async function addTransaction(tx) {
-  const list = await loadTransactions();
-  list.push(tx);
-  await saveTransactions(list);
-  return list;
+export function addTransaction(tx) {
+  return serial(TX_KEY, async () => {
+    const list = await loadTransactions();
+    list.push(tx);
+    await saveTransactions(list);
+    return list;
+  });
 }
 
-export async function deleteTransaction(id) {
-  const list = await loadTransactions();
-  const filtered = list.filter((t) => t.id !== id);
-  await saveTransactions(filtered);
-  return filtered;
+export function deleteTransaction(id) {
+  return serial(TX_KEY, async () => {
+    const list = await loadTransactions();
+    const filtered = list.filter((t) => t.id !== id);
+    await saveTransactions(filtered);
+    return filtered;
+  });
 }
 
-export async function updateTransaction(id, changes) {
-  const list = await loadTransactions();
-  const updated = list.map((t) => (t.id === id ? { ...t, ...changes } : t));
-  await saveTransactions(updated);
-  return updated;
+export function updateTransaction(id, changes) {
+  return serial(TX_KEY, async () => {
+    const list = await loadTransactions();
+    const updated = list.map((t) => (t.id === id ? { ...t, ...changes } : t));
+    await saveTransactions(updated);
+    return updated;
+  });
 }
 
-export async function addTransactions(newList) {
-  const list = await loadTransactions();
-  const merged = [...list, ...newList];
-  await saveTransactions(merged);
-  return merged;
+export function addTransactions(newList) {
+  return serial(TX_KEY, async () => {
+    const list = await loadTransactions();
+    const merged = [...list, ...newList];
+    await saveTransactions(merged);
+    return merged;
+  });
 }
 
 // Moves every entry from one tag to another (used when a tag is deleted)
-export async function reassignCategory(fromId, toId) {
-  const list = await loadTransactions();
-  const updated = list.map((t) => (t.category === fromId ? { ...t, category: toId } : t));
-  await saveTransactions(updated);
-  return updated;
+export function reassignCategory(fromId, toId) {
+  return serial(TX_KEY, async () => {
+    const list = await loadTransactions();
+    const updated = list.map((t) => (t.category === fromId ? { ...t, category: toId } : t));
+    await saveTransactions(updated);
+    return updated;
+  });
 }
 
 // When an account is deleted its entries fall back to the default account
-export async function clearAccount(accountId) {
-  const list = await loadTransactions();
-  const updated = list.map((t) => {
-    if (t.account !== accountId) return t;
-    const { account, ...rest } = t;
-    return rest;
+export function clearAccount(accountId) {
+  return serial(TX_KEY, async () => {
+    const list = await loadTransactions();
+    const updated = list.map((t) => {
+      if (t.account !== accountId) return t;
+      const { account, ...rest } = t;
+      return rest;
+    });
+    await saveTransactions(updated);
+    return updated;
   });
-  await saveTransactions(updated);
-  return updated;
 }

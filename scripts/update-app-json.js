@@ -35,6 +35,9 @@ const si = expo.plugins.findIndex((p) => nameOf(p) === 'expo-splash-screen');
 if (si === -1) { expo.plugins.push(SPLASH); added.push('expo-splash-screen'); } else { expo.plugins[si] = SPLASH; }
 
 const changes = [];
+// show "2.0.0" as the version in Android settings (the build number still goes up automatically)
+const [maj] = String(expo.version || '1.0.0').split('.').map(Number);
+if (!(maj >= 2)) { changes.push(`version: "${expo.version || '(not set)'}" -> "2.0.0"`); expo.version = '2.0.0'; }
 if (fs.existsSync(path.join(__dirname, '..', 'assets', 'ledger', 'icon.png'))) {
   expo.icon = './assets/ledger/icon.png';
   expo.android = expo.android || {};

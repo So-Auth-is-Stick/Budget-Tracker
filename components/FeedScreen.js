@@ -19,6 +19,7 @@ import InsightsScreen from './InsightsScreen';
 import { useAccounts, accountBalances } from './accounts';
 import { TransferSheet, AccountActivity } from './AccountsUI';
 import * as haptic from './haptics';
+import { CountUp } from './motion';
 
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const shiftDay = (ds, n) => { const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -102,7 +103,7 @@ export default function FeedScreen({ categories, setCategories, transactions, se
             <Text style={styles.label}>Balance</Text>
             <Ionicons name={prefs.hideAmounts ? 'eye-off-outline' : 'eye-outline'} size={15} color={t.inkFaint} />
           </TouchableOpacity>
-          <Text style={[styles.balance, balance < 0 && { color: t.spend }]} numberOfLines={1} adjustsFontSizeToFit>{peso(balance, 2)}</Text>
+          <CountUp value={balance} format={(v) => peso(v, 2)} style={[styles.balance, balance < 0 && { color: t.spend }]} numberOfLines={1} adjustsFontSizeToFit />
         </View>
         <View style={styles.iconCol}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => setCategoryModalVisible(true)} accessibilityLabel="Tags">

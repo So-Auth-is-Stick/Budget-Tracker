@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { findCategory } from './categories';
 import { monthOf, prevMonthOf, formatLong } from './dateUtils';
-import { monthStats, weekdayPattern, observations, monthLabel, nextMonthOf, badges } from './insights';
+import { monthStats, weekdayPattern, observations, monthLabel, nextMonthOf, badges, monthsTrend } from './insights';
 import { usePrefs } from './prefs';
 import { peso, pesoShort } from './format';
 import { useToday } from './useToday';
@@ -24,6 +24,8 @@ export default function InsightsScreen({ visible, onClose, transactions, categor
   useEffect(() => { if (visible) { setMonth(initialMonth || monthOf(today)); setPickedDay(null); } }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   const badgeList = useMemo(() => badges({ transactions, goals, categories, prefs, today }), [transactions, goals, categories, prefs, today]);
   const earnedCount = badgeList.filter((b) => b.earned).length;
+  const trend = useMemo(() => monthsTrend(transactions, month, 6), [transactions, month]);
+  const trendMax = Math.max(1, ...trend.map((r) => Math.max(r.spent, r.earned)));
 
   const firstMonth = useMemo(() => transactions.reduce((m, tx) => (tx.date.slice(0, 7) < m ? tx.date.slice(0, 7) : m), monthOf(today)), [transactions, today]);
   const cur = useMemo(() => monthStats(transactions, month, today), [transactions, month, today]);
@@ -153,6 +155,36 @@ export default function InsightsScreen({ visible, onClose, transactions, categor
             )}
           </View>
 
+          {/* Six months */}
+          <View style={styles.card}>
+            <View style={styles.cardHeadRow}>
+              <Text style={styles.cardTitle}>Last 6 months</Text>
+              <View style={styles.legendRow}>
+                <View style={[styles.legendDot, { backgroundColor: t.gain }]} /><Text style={styles.cardMeta}>earned</Text>
+                <View style={[styles.legendDot, { backgroundColor: t.spend, marginLeft: 8 }]} /><Text style={styles.cardMeta}>spent</Text>
+              </View>
+            </View>
+            <View style={styles.trendChart}>
+              {trend.map((r) => {
+                const sel = r.month === month;
+                return (
+                  <TouchableOpacity key={r.month} style={styles.trendCol} onPress={() => { haptic.tap(); setPickedDay(null); setMonth(r.month); }}
+                    disabled={r.month > monthOf(today) || r.month < firstMonth}>
+                    <View style={styles.trendBars}>
+                      <View style={[styles.trendBar, { height: Math.max(2, (r.earned / trendMax) * 96), backgroundColor: t.gain + (sel ? 'FF' : '88') }]} />
+                      <View style={[styles.trendBar, { height: Math.max(2, (r.spent / trendMax) * 96), backgroundColor: t.spend + (sel ? 'FF' : '88') }]} />
+                    </View>
+                    <Text style={[styles.trendLabel, sel && { color: t.ink, fontWeight: '700' }]}>{monthLabel(r.month).slice(0, 3)}</Text>
+                    <Text style={[styles.trendNet, { color: r.earned - r.spent >= 0 ? t.gain : t.spend }]} numberOfLines={1}>
+                      {r.earned || r.spent ? (r.earned - r.spent >= 0 ? '+' : '−') + pesoShort(Math.abs(r.earned - r.spent)).replace('₱', '') : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.cardFoot}>Small numbers show what you kept (+) or overspent (−). Tap a month to open it.</Text>
+          </View>
+
           {/* Weekday pattern */}
           <View style={styles.card}>
             <View style={styles.cardHeadRow}>
@@ -264,6 +296,14 @@ const makeStyles = (t) => StyleSheet.create({
   catPct: { color: t.inkDim, fontSize: 12, width: 36, textAlign: 'right' },
   catAmt: { color: t.ink, fontSize: 13.5, fontWeight: '600', width: 78, textAlign: 'right' },
   catChange: { fontSize: 11.5, width: 48, textAlign: 'right' },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  trendChart: { flexDirection: 'row', alignItems: 'flex-end', height: 140 },
+  trendCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+  trendBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
+  trendBar: { width: 11, borderRadius: 4 },
+  trendLabel: { color: t.inkDim, fontSize: 11.5, marginTop: 5 },
+  trendNet: { fontSize: 9.5, marginTop: 1 },
   wkChart: { flexDirection: 'row', alignItems: 'flex-end', height: 104 },
   wkCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   wkVal: { color: t.inkFaint, fontSize: 9.5, marginBottom: 3 },

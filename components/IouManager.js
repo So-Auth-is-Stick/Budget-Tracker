@@ -8,6 +8,7 @@ import { sortByRecent } from './sortUtils';
 import { peso } from './format';
 import { useTheme, readableOn } from './theme';
 import * as haptic from './haptics';
+import { GrowBar } from './motion';
 
 // "Lent & borrowed" section in the Planner
 export default function IouManager({ openAddToken }) {
@@ -69,7 +70,7 @@ export default function IouManager({ openAddToken }) {
           </View>
           <Text style={[styles.amt, { color }]}>{peso(x.settled ? x.amount : remainingOf(x), 0)}</Text>
         </View>
-        {(x.paid || 0) > 0 && !x.settled && <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: color }]} /></View>}
+        {(x.paid || 0) > 0 && !x.settled && <View style={styles.track}><GrowBar pct={pct} style={[styles.fill, { backgroundColor: color }]} /></View>}
       </TouchableOpacity>
     );
   };

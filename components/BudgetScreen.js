@@ -11,6 +11,7 @@ import { sortByRecent } from './sortUtils';
 import { useToday } from './useToday';
 import { useTheme } from './theme';
 import { peso } from './format';
+import { GrowBar } from './motion';
 
 export default function BudgetScreen({ categories, setCategories, transactions, goals = [] }) {
   const { theme: t } = useTheme();
@@ -99,7 +100,7 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
           <Text style={styles.limitLabel}>{label}</Text>
           <Text style={[styles.limitAmt, over && { color: t.spend }]}>{over ? '⚠️ ' : ''}{peso(spent, 0)} / {peso(limit, 0)}</Text>
         </View>
-        <View style={styles.track}><View style={[styles.fill, { width: `${pct}%`, backgroundColor: over ? t.spend : color }]} /></View>
+        <View style={styles.track}><GrowBar pct={pct} style={[styles.fill, { backgroundColor: over ? t.spend : color }]} /></View>
       </View>
     );
   };
@@ -121,7 +122,7 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
           </Text>
           {totalMonthlyBudget > 0 && (
             <View style={styles.heroTrack}>
-              <View style={[styles.heroFill, { width: `${heroPct}%`, backgroundColor: heroOver ? t.spend : t.accent }]} />
+              <GrowBar pct={heroPct} style={[styles.heroFill, { backgroundColor: heroOver ? t.spend : t.accent }]} />
             </View>
           )}
           {totalMonthlyBudget > 0 && (

@@ -6,6 +6,7 @@ import { sortByRecent } from './sortUtils';
 import { useTheme, readableOn } from './theme';
 import { useToday } from './useToday';
 import { peso } from './format';
+import { GrowBar } from './motion';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -113,7 +114,7 @@ export default function RecurringManager({ categories, rules, setRules, openAddT
               <View style={[styles.iconCircle, { backgroundColor: cat.color + '35' }]}><Text style={{ fontSize: 14 }}>{cat.icon}</Text></View>
               <Text style={styles.name} numberOfLines={1}>{rule.note || cat.label}</Text>
             </View>
-            <View style={styles.track}><View style={[styles.fill, { width: `${cycleProgress(rule, today)}%`, backgroundColor: color }]} /></View>
+            <View style={styles.track}><GrowBar pct={cycleProgress(rule, today)} style={[styles.fill, { backgroundColor: color }]} /></View>
             <Text style={styles.amt}>{sign}{peso(rule.amount, 0)}</Text>
           </TouchableOpacity>
         );

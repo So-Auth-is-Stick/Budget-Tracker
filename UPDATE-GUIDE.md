@@ -19,6 +19,7 @@ From this zip, copy into your `BudgetTracker` folder and **replace** when asked:
 | `scripts/update-app-json.js` | `BudgetTracker/scripts/` (new folder) |
 | `assets/ledger/` (new app icon + splash) | `BudgetTracker/assets/ledger/` |
 | `.github/workflows/*.yml` | `BudgetTracker/.github/workflows/` |
+| `README.md` + `docs/` (screenshots) | `BudgetTracker/` (for your GitHub page) |
 
 Don't replace `app.json` or `eas.json`. Those hold your app's identity (step 3 updates app.json for you).
 
@@ -70,6 +71,13 @@ From then on your data is safe even if the phone is lost.
 * **Accounts** (optional, Settings → Accounts): Cash, GCash, Maya, Bank… each with its own balance on the Balance screen. **Move money** between them (ATM, cash-in) without it counting as spending. Your existing entries belong to the first ("main") account.
 * **Lent & borrowed** (Planner → + → Lent / borrowed): keep track of utang both ways, record partial pay-backs, see totals owed to you / by you.
 * A short **welcome** for new users (useful if you share the app): what it does, starting balance, pick a theme. You won't see it, because you already have data.
+
+**New in round 4**
+* Insights: a **last 6 months** chart (earned vs spent, tap a month to open it).
+* Progress bars grow smoothly and the balance counts up when it changes.
+* Saving is now strictly one-at-a-time behind the scenes, so two quick saves can never overwrite each other, and a double-tap on Save no longer logs twice.
+* You'll be asked for notification permission once, the first time you have a plan with a due date or a recurring entry.
+* The app now shows version **2.0.0** in Android settings. A refreshed README with screenshots is included for GitHub.
 
 **Safety**
 * **Backup / restore** to a file (Drive, Gmail…), with undo for a restore, plus a reminder if you've never backed up. **Export to spreadsheet (.csv)**.

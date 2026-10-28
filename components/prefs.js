@@ -19,6 +19,7 @@ export const DEFAULT_PREFS = {
   recapDismissed: null,
   onboarded: false,
   lastAccount: null,
+  askedNotif: false,
 };
 
 let current = { ...DEFAULT_PREFS };
