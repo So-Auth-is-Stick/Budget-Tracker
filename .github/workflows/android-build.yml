@@ -1,16 +1,26 @@
 # Builds the Android APK on GitHub's servers and signs it with the key EAS already holds
 # for your app, so it installs as an UPDATE over the old app (your data stays).
 #
-# Run it: GitHub repo > Actions > "Build Android APK" > Run workflow,
-# or push a tag like v1.1.0 to also attach the APK to a GitHub Release.
+# Runs by itself after every push to main (skip one by putting [skip ci] in the commit message),
+# or by hand: GitHub repo > Actions > "Build Android APK" > Run workflow.
+# Push a tag like v2.1.0 to also attach the APK to a GitHub Release.
 #
 # If this one keeps failing, use "Build Android APK (Expo cloud)" instead - same result, fewer moving parts.
 name: Build Android APK
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:          # the manual "Run workflow" button still works
   push:
-    tags: ['v*']
+    branches: [main]          # build after every push to main
+    tags: ['v*']              # a tag like v2.1.0 also attaches the APK to a Release
+    paths-ignore:             # ...but not when only docs/screenshots changed
+      - '**.md'
+      - 'docs/**'
+
+# If you push again while a build is still running, cancel the old one and build the newest
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write   # lets the job create a Release when you push a tag
