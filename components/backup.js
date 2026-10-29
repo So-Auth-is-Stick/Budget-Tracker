@@ -5,7 +5,7 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { todayStr } from './dateUtils';
 
-export const DATA_KEYS = ['budget_transactions', 'budget_categories', 'budget_goals', 'budget_recurring', 'budget_iou', 'budget_accounts', 'budget_transfers', 'budget_theme', 'budget_prefs'];
+export const DATA_KEYS = ['budget_transactions', 'budget_categories', 'budget_goals', 'budget_recurring', 'budget_iou', 'budget_accounts', 'budget_transfers', 'budget_theme', 'budget_accent', 'budget_prefs'];
 const PRE_RESTORE_KEY = 'budget_prerestore_snapshot';
 
 async function snapshot() {
@@ -75,7 +75,7 @@ async function writeData(data) {
   const sets = [];
   const removes = [];
   DATA_KEYS.forEach((k) => {
-    if (data[k] === undefined) { if (!['budget_theme', 'budget_prefs', 'budget_iou', 'budget_accounts', 'budget_transfers'].includes(k)) removes.push(k); return; }
+    if (data[k] === undefined) { if (!['budget_theme', 'budget_accent', 'budget_prefs', 'budget_iou', 'budget_accounts', 'budget_transfers'].includes(k)) removes.push(k); return; }
     sets.push([k, typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k])]);
   });
   if (sets.length) await AsyncStorage.multiSet(sets);

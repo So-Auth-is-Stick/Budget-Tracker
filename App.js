@@ -20,6 +20,8 @@ import { loadTransactions, addTransaction, addTransactions } from './components/
 import { loadGoals, updateGoal } from './components/goals';
 import { loadRecurring, saveRecurring, REC_KEY } from './components/recurring';
 import { serial } from './components/serial';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { cleanupEntryImages } from './components/imageStore';
 import { processRecurring } from './components/recurringEngine';
 import { syncReminders, ensurePermission } from './components/notifications';
 import { useTxActions } from './components/txActions';
@@ -38,7 +40,7 @@ const TABS = [
 ];
 
 function Main() {
-  const { theme: t } = useTheme();
+  const { theme: t, reloadTheme } = useTheme();
   const { prefs, setPref, reload: reloadPrefs } = usePrefs();
   const { reload: reloadAccounts } = useAccounts();
   const toast = useToast();
@@ -84,14 +86,23 @@ function Main() {
     setTransactions(txs);
     setGoals(gls);
     setRecurringRules(rules);
-    await Promise.all([reloadPrefs(), reloadAccounts()]);
-  }, [reloadPrefs, reloadAccounts]);
+    await Promise.all([reloadPrefs(), reloadAccounts(), reloadTheme()]);
+  }, [reloadPrefs, reloadAccounts, reloadTheme]);
 
   useEffect(() => {
     (async () => {
       await reloadAll();
       setLoaded(true);
       await runRecurring();
+      // tidy up picture copies no entry uses any more (kept a week for Undo)
+      setTimeout(async () => {
+        try {
+          const txs = await loadTransactions();
+          const snap = JSON.parse((await AsyncStorage.getItem('budget_prerestore_snapshot')) || 'null');
+          const older = (snap && snap.data && snap.data.budget_transactions) || [];
+          cleanupEntryImages([...txs, ...older].filter((x) => x.image && x.image.file).map((x) => x.image.file));
+        } catch (e) {}
+      }, 4000);
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

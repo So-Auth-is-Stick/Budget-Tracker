@@ -14,6 +14,8 @@ const NEEDED = [
   ['expo-notifications', { color: '#E8B84B' }],
   ['expo-local-authentication', { faceIDPermission: 'Allow Ledger to use Face ID to unlock.' }],
   'expo-font',
+  // pictures on entries: picks from your photos only (camera and microphone are switched off)
+  ['expo-image-picker', { photosPermission: 'Allow Ledger to use pictures you choose for your entries.', cameraPermission: false, microphonePermission: false }],
 ];
 
 // New app icon + splash screen (files live in assets/ledger/)

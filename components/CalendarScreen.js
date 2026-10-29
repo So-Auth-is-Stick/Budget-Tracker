@@ -281,7 +281,7 @@ export default function CalendarScreen({ categories, transactions, setTransactio
             </TouchableOpacity>
 
             <TransactionDetailModal visible={!!detailItem} item={detailItem} categories={categories} onClose={() => setDetailItem(null)} onDelete={handleDelete} onSave={handleEditSave}
-        onDuplicate={(it) => txActions.add({ type: it.type, amount: it.amount, category: it.category, note: (it.note || '').replace(/ \(auto\)$/, ''), id: Date.now(), date: today })} />
+        onDuplicate={(it) => txActions.add({ type: it.type, amount: it.amount, category: it.category, note: (it.note || '').replace(/ \(auto\)$/, ''), id: Date.now(), date: today, ...(it.image ? { image: it.image, imageLook: it.imageLook } : {}) })} />
             <GoalDetailModal
               visible={!!detailGoal}
               goal={detailGoal}

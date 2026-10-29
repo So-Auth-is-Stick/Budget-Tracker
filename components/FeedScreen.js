@@ -9,25 +9,18 @@ import TransactionDetailModal from './TransactionDetailModal';
 import SettingsModal from './SettingsModal';
 import { findCategory } from './categories';
 import { computeOverLimitFlags } from './overLimit';
-import { formatLong, getWeekRange } from './dateUtils';
+import { formatLong, monthOf } from './dateUtils';
 import { useToday } from './useToday';
 import { useTheme, readableOn } from './theme';
 import { usePrefs } from './prefs';
-import { peso, pesoShort } from './format';
-import { loggingStreak, lastMonthRecap, monthLabel } from './insights';
+import { peso } from './format';
+import { loggingStreak, lastMonthRecap, monthLabel, observations } from './insights';
 import InsightsScreen from './InsightsScreen';
 import { useAccounts, accountBalances } from './accounts';
 import { TransferSheet, AccountActivity } from './AccountsUI';
 import * as haptic from './haptics';
 import { CountUp } from './motion';
 
-const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const shiftDay = (ds, n) => { const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-
-function greeting() {
-  const h = new Date().getHours();
-  return h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-}
 
 export default function FeedScreen({ categories, setCategories, transactions, setTransactions, goals, onDataRestored }) {
   const { theme: t } = useTheme();
@@ -40,7 +33,6 @@ export default function FeedScreen({ categories, setCategories, transactions, se
   const [detailItem, setDetailItem] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [activeFilterCat, setActiveFilterCat] = useState(null);
-  const [selectedDay, setSelectedDay] = useState(null); // tapped bar in the week chart
   const [insightsMonth, setInsightsMonth] = useState(null);
   const { accounts, transfers } = useAccounts();
   const [transferFrom, setTransferFrom] = useState(null); // null = closed, '' = open with default
@@ -57,18 +49,13 @@ export default function FeedScreen({ categories, setCategories, transactions, se
   const flags = useMemo(() => computeOverLimitFlags(transactions, categories), [transactions, categories]);
   const streak = useMemo(() => loggingStreak(transactions, today), [transactions, today]);
 
-  // Sun..Sat spending for this week
-  const week = useMemo(() => {
-    const { start } = getWeekRange(today);
-    const days = Array.from({ length: 7 }, (_, i) => shiftDay(start, i));
-    const totals = days.map((d) => transactions.filter((tx) => tx.type === 'expense' && tx.date === d).reduce((s, tx) => s + tx.amount, 0));
-    return { days, totals, max: Math.max(1, ...totals), sum: totals.reduce((a, b) => a + b, 0) };
-  }, [transactions, today]);
+  // One headline from Insights, shown on the card that opens it
+  const headline = useMemo(() => observations(transactions, categories, monthOf(today), today)[0] || null, [transactions, categories, today]);
 
   // Normally only today is shown. Searching or picking a tag looks through every day.
   const query = searchText.trim().toLowerCase();
   const filtering = query !== '' || !!activeFilterCat;
-  const shownDay = selectedDay || today;
+  const shownDay = today;
   const rows = useMemo(() => {
     const list = filtering
       ? transactions.filter((tx) => {
@@ -98,7 +85,6 @@ export default function FeedScreen({ categories, setCategories, transactions, se
     <View>
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.greet}>{greeting()}</Text>
           <TouchableOpacity style={styles.labelRow} onPress={() => { haptic.tap(); setPref('hideAmounts', !prefs.hideAmounts); }} accessibilityLabel={prefs.hideAmounts ? 'Show amounts' : 'Hide amounts'}>
             <Text style={styles.label}>Balance</Text>
             <Ionicons name={prefs.hideAmounts ? 'eye-off-outline' : 'eye-outline'} size={15} color={t.inkFaint} />
@@ -143,28 +129,19 @@ export default function FeedScreen({ categories, setCategories, transactions, se
         </ScrollView>
       )}
 
-      <View style={styles.weekCard}>
-        <View style={styles.weekHead}>
-          <Text style={styles.weekTitle}>This week <Text style={{ color: t.spend, fontWeight: '700' }}>{peso(week.sum, 0)}</Text></Text>
-          {streak > 1 && <View style={styles.streak}><Text style={styles.streakText}>🔥 {streak}-day streak</Text></View>}
+      <TouchableOpacity style={styles.insightsCard} activeOpacity={0.8} onPress={() => { haptic.tap(); setInsightsMonth(monthOf(today)); }} accessibilityLabel="Open insights">
+        <View style={styles.insightsIcon}><Ionicons name="analytics" size={20} color={t.onAccent} /></View>
+        <View style={{ flex: 1 }}>
+          <View style={styles.insightsHead}>
+            <Text style={styles.insightsTitle}>Insights</Text>
+            {streak > 1 && <Text style={styles.streakText}>🔥 {streak}-day streak</Text>}
+          </View>
+          <Text style={styles.insightsText} numberOfLines={2}>
+            {headline ? headline.text : 'Charts, trends and badges for your money.'}
+          </Text>
         </View>
-        <View style={styles.bars}>
-          {week.days.map((d, i) => {
-            const isToday = d === today;
-            const isSel = d === shownDay && !filtering;
-            const future = d > today;
-            const h = week.totals[i] > 0 ? Math.max(6, (week.totals[i] / week.max) * 64) : 3;
-            return (
-              <TouchableOpacity key={d} style={styles.barCol} disabled={future}
-                onPress={() => { haptic.tap(); setSelectedDay(d === today || d === selectedDay ? null : d); }}>
-                <Text style={styles.barVal} numberOfLines={1}>{week.totals[i] > 0 ? pesoShort(week.totals[i]).replace('₱', '') : ''}</Text>
-                <View style={[styles.bar, { height: h, backgroundColor: future ? t.edge : isSel ? t.accent : t.spend + (isToday ? 'CC' : '77') }]} />
-                <Text style={[styles.barDay, isToday && { color: t.accent, fontWeight: '700' }, isSel && !isToday && { color: t.ink, fontWeight: '700' }]}>{DOW[i]}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+        <Ionicons name="chevron-forward" size={20} color={t.accent} />
+      </TouchableOpacity>
 
       {showRecap && (
         <TouchableOpacity activeOpacity={0.85} style={styles.recap} onPress={() => setInsightsMonth(recap.month)}>
@@ -226,9 +203,6 @@ export default function FeedScreen({ categories, setCategories, transactions, se
           {filtering ? `${rows.length} ${rows.length === 1 ? 'match' : 'matches'} from all days` : shownDay === today ? `Today · ${formatLong(today)}` : formatLong(shownDay)}
         </Text>
         {filtering && filteredTotal > 0 && <Text style={styles.sectionTotal}>{peso(filteredTotal, 0)} spent</Text>}
-        {!filtering && selectedDay && (
-          <TouchableOpacity onPress={() => setSelectedDay(null)}><Text style={styles.sectionAction}>Back to today</Text></TouchableOpacity>
-        )}
       </View>
     </View>
   );
@@ -267,7 +241,7 @@ export default function FeedScreen({ categories, setCategories, transactions, se
       </Modal>
 
       <TransactionDetailModal visible={!!detailItem} item={detailItem} categories={categories} onClose={() => setDetailItem(null)} onDelete={handleDelete} onSave={handleEditSave}
-        onDuplicate={(it) => txActions.add({ type: it.type, amount: it.amount, category: it.category, note: (it.note || '').replace(/ \(auto\)$/, ''), id: Date.now(), date: today })} />
+        onDuplicate={(it) => txActions.add({ type: it.type, amount: it.amount, category: it.category, note: (it.note || '').replace(/ \(auto\)$/, ''), id: Date.now(), date: today, ...(it.image ? { image: it.image, imageLook: it.imageLook } : {}) })} />
       <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} onDataRestored={onDataRestored} transactions={transactions} categories={categories} setTransactions={setTransactions} />
       <TransferSheet visible={transferFrom !== null} presetFrom={transferFrom || undefined} onClose={() => setTransferFrom(null)} />
       <AccountActivity account={activityAcc} onClose={() => setActivityAcc(null)} transactions={transactions} categories={categories}
@@ -280,7 +254,6 @@ export default function FeedScreen({ categories, setCategories, transactions, se
 const makeStyles = (t) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.bg },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, marginBottom: 14 },
-  greet: { color: t.inkDim, fontSize: 13.5, marginBottom: 6 },
   iconCol: { flexDirection: 'row', gap: 10, paddingTop: 2 },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface2, alignItems: 'center', justifyContent: 'center' },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
@@ -296,16 +269,12 @@ const makeStyles = (t) => StyleSheet.create({
   accBal: { color: t.ink, fontSize: 16, fontWeight: '700' },
   accMove: { borderStyle: 'dashed', borderColor: t.accent, alignItems: 'center', justifyContent: 'center', minWidth: 100, gap: 2 },
   accMoveText: { color: t.accent, fontSize: 12, fontWeight: '700' },
-  weekCard: { marginHorizontal: 20, backgroundColor: t.surface, borderRadius: 18, padding: 14, marginBottom: 12 },
-  weekHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  weekTitle: { color: t.inkDim, fontSize: 13 },
-  streak: { backgroundColor: t.accent + '22', paddingVertical: 3, paddingHorizontal: 9, borderRadius: 10 },
+  insightsCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, marginBottom: 12, padding: 14, borderRadius: 18, backgroundColor: t.accent + '1F', borderWidth: 1, borderColor: t.accent + '66' },
+  insightsIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' },
+  insightsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  insightsTitle: { color: t.ink, fontSize: 15.5, fontWeight: '800' },
+  insightsText: { color: t.inkDim, fontSize: 12.5, lineHeight: 17 },
   streakText: { color: t.accent, fontSize: 12, fontWeight: '700' },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 100 },
-  barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
-  barVal: { color: t.inkFaint, fontSize: 9.5, marginBottom: 3 },
-  bar: { width: 18, borderRadius: 6 },
-  barDay: { color: t.inkDim, fontSize: 11.5, marginTop: 5 },
   recap: { marginHorizontal: 20, marginBottom: 12, padding: 14, borderRadius: 18, backgroundColor: t.surface, borderWidth: 1, borderColor: t.accent + '66' },
   recapHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   recapTitle: { color: t.ink, fontSize: 15, fontWeight: '700' },

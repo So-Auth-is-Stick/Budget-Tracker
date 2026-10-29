@@ -10,11 +10,6 @@ import * as haptic from './haptics';
 const MAX_TRIES = 5;
 const LOCK_SECONDS = 30;
 
-function greeting() {
-  const h = new Date().getHours();
-  return h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-}
-
 export default function PinScreen({ onUnlock }) {
   const { theme: t } = useTheme();
   const { prefs } = usePrefs();
@@ -122,8 +117,8 @@ export default function PinScreen({ onUnlock }) {
     }
   };
 
-  const titles = { loading: '', setup: 'Create a 4-digit PIN', confirm: 'Type it once more', unlock: greeting() };
-  const subtitles = { setup: 'You will use it every time you open Ledger.', confirm: 'Just to be sure.', unlock: 'Enter your PIN' };
+  const titles = { loading: '', setup: 'Create a 4-digit PIN', confirm: 'Type it once more', unlock: 'Enter your PIN' };
+  const subtitles = { setup: 'You will use it every time you open Ledger.', confirm: 'Just to be sure.', unlock: ' ' };
   if (mode === 'loading') return <View style={styles.container} />;
 
   const shakeX = shake.interpolate({ inputRange: [-1, 1], outputRange: [-12, 12] });

@@ -12,10 +12,12 @@ Everything stays on your phone: no account, no server, no ads.
 - A live hint while you type ("₱120 left for Food today"), a warning when an entry pushes a tag over its limit, and **Undo** after every save or delete.
 - Optional **accounts** (Cash, GCash, Maya, Bank…) with per-account balances and *Move money* between them.
 
+- **Pictures & GIFs** on entries in three looks (Fade, Glass, Clear), stored privately inside the app.
+
 **See where it goes**
-- **Balance**: balance, spent today, *safe to spend* (minus money set aside for plans), this week's spending chart, and a logging streak 🔥.
+- **Balance**: balance, spent today, *safe to spend* (minus money set aside for plans), and a logging streak 🔥.
 - **Calendar heat map**: every day shows what you spent, shaded by how heavy it was. Tap a tag to highlight the days you spent on it.
-- **Insights**: earned / spent / kept, plain-English observations, day-by-day chart with a month-end projection, spending by tag vs last month, your heaviest weekday, biggest expenses, a 6-month trend, and **badges**.
+- **Insights** (card on the Balance screen): earned / spent / kept, plain-English observations, day-by-day chart with a month-end projection, spending by tag vs last month, your heaviest weekday, biggest expenses, a 6-month trend, and **badges**.
 - **Budgets**: daily, weekly and monthly limits per tag, "about ₱X a day left this month", and suggested limits based on what you usually spend.
 
 **Plan ahead**
@@ -27,7 +29,7 @@ Everything stays on your phone: no account, no server, no ads.
 **Safe and private**
 - 4-digit PIN (stored in encrypted secure storage), optional **fingerprint unlock**, lockout after 5 wrong tries, auto-lock after 2 minutes in the background, and a *hide amounts* eye.
 - **Backup & restore** to a single file (save it to Google Drive or email), and **export to CSV** for Excel / Google Sheets.
-- Six themes plus Auto (follows the phone's dark mode).
+- 18 themes plus Auto (follows the phone's dark mode), a custom accent colour, and an 80-colour palette.
 
 | | | |
 |---|---|---|

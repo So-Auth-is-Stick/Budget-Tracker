@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, Alert, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DatePickerModal from './DatePickerModal';
+import ColorPicker from './ColorPicker';
 import CommitGoalModal from './CommitGoalModal';
 import { daysUntil, formatLong } from './dateUtils';
 import { canCommit, isFullyFunded } from './goals';
@@ -31,6 +32,7 @@ export function GoalLookPicker({ icon, color, onIcon, onColor }) {
           <TouchableOpacity key={c} onPress={() => onColor(c)} accessibilityLabel={`colour ${c}`}
             style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: c, borderWidth: color === c ? 3 : 0, borderColor: t.ink }} />
         ))}
+        <ColorPicker trigger="more" size={28} value={color} active={!GOAL_COLORS.includes(color)} onChange={onColor} title="Plan colour" />
       </View>
     </View>
   );

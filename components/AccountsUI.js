@@ -8,6 +8,7 @@ import { formatLong, todayStr } from './dateUtils';
 import { peso } from './format';
 import { useTheme, readableOn } from './theme';
 import * as haptic from './haptics';
+import ColorPicker from './ColorPicker';
 
 const ICONS = ['💵', '📱', '📲', '🏦', '💳', '🐷', '👛', '🪙', '💼', '🏧'];
 const COLORS = ['#7FC29B', '#42A5F5', '#26A69A', '#5C6BC0', '#AB47BC', '#EC407A', '#E8B84B', '#FF7043', '#8D6E63', '#78909C'];
@@ -94,6 +95,7 @@ export function AccountsManager({ visible, onClose, transactions, setTransaction
                   {COLORS.map((c) => (
                     <TouchableOpacity key={c} onPress={() => setForm({ ...form, color: c })} style={[styles.colorDot, { backgroundColor: c }, form.color === c && { borderWidth: 3, borderColor: t.ink }]} />
                   ))}
+                  <ColorPicker trigger="more" size={28} value={form.color} active={!COLORS.includes(form.color)} onChange={(c) => setForm({ ...form, color: c })} title="Account colour" />
                 </View>
                 <TouchableOpacity style={styles.saveBtn} onPress={save}><Text style={styles.saveText}>{form.id ? 'Save' : 'Add account'}</Text></TouchableOpacity>
                 {form.id && !accounts.find((a) => a.id === form.id)?.isDefault && (

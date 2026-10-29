@@ -1,8 +1,6 @@
 import { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import InsightsScreen from './InsightsScreen';
 import { daysInMonth } from './insights';
 import * as haptic from './haptics';
 import { updateCategory } from './categories';
@@ -22,7 +20,6 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
   const [dailyInput, setDailyInput] = useState('');
   const [weeklyInput, setWeeklyInput] = useState('');
   const [monthlyInput, setMonthlyInput] = useState('');
-  const [insightsOpen, setInsightsOpen] = useState(false);
 
   const currentMonth = monthOf(today);
   const lastMonth = prevMonthOf(currentMonth);
@@ -111,10 +108,6 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
         <View style={styles.heroCard}>
           <View style={styles.heroTop}>
             <Text style={styles.heroLabel}>Spent this month</Text>
-            <TouchableOpacity style={styles.insightsBtn} onPress={() => { haptic.tap(); setInsightsOpen(true); }}>
-              <Ionicons name="analytics" size={15} color={t.onAccent} />
-              <Text style={styles.insightsText}>Insights</Text>
-            </TouchableOpacity>
           </View>
           <Text style={styles.heroAmt}>
             {peso(totalMonthlySpent, 0)}
@@ -159,7 +152,6 @@ export default function BudgetScreen({ categories, setCategories, transactions, 
         })}
       </ScrollView>
 
-      <InsightsScreen visible={insightsOpen} onClose={() => setInsightsOpen(false)} transactions={transactions} categories={categories} goals={goals} />
 
       <Modal visible={!!limitModalCat} animationType="slide" transparent onRequestClose={() => setLimitModalCat(null)}>
         <View style={styles.overlay}>
@@ -199,8 +191,6 @@ const makeStyles = (t) => StyleSheet.create({
   heroCard: { backgroundColor: t.surface2, borderRadius: 20, padding: 20, marginHorizontal: 20, marginBottom: 24 },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   heroLabel: { color: t.inkDim, fontSize: 13 },
-  insightsBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: t.accent, paddingVertical: 6, paddingHorizontal: 11, borderRadius: 14 },
-  insightsText: { color: t.onAccent, fontWeight: '700', fontSize: 12.5 },
   heroLeft: { fontSize: 13, fontWeight: '600', marginTop: 10 },
   suggestBox: { backgroundColor: t.accent + '1A', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: t.accent + '55' },
   suggestText: { color: t.ink, fontSize: 13 },

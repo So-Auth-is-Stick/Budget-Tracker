@@ -7,6 +7,9 @@ import { formatLong, todayStr } from './dateUtils';
 import { useTheme, readableOn } from './theme';
 import { peso } from './format';
 import { useAccounts, accountOf } from './accounts';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { pickEntryImage, imageUri, IMAGE_LOOKS } from './imageStore';
 
 export default function TransactionDetailModal({ visible, item, categories, onClose, onDelete, onSave, onDuplicate }) {
   const { theme: t } = useTheme();
@@ -17,6 +20,10 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
   const [categoryId, setCategoryId] = useState(null);
   const [date, setDate] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [image, setImage] = useState(null);
+  const [imageLook, setImageLook] = useState('fade');
+  const [viewer, setViewer] = useState(false);     // full-screen picture
+  const [imgBroken, setImgBroken] = useState(false);
   const { accounts } = useAccounts();
   const [accountId, setAccountId] = useState(null);
 
@@ -27,6 +34,9 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
       setCategoryId(item.category);
       setDate(item.date);
       setAccountId(accountOf(item, accounts));
+      setImage(item.image || null);
+      setImageLook(item.imageLook || 'fade');
+      setImgBroken(false);
       setEditing(false);
     }
   }, [item]);
@@ -46,9 +56,16 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
   };
 
   const value = parseFloat(String(amount).replace(/,/g, ''));
+  const changePicture = async () => {
+    try { const img = await pickEntryImage(); if (img) { setImage(img); setImgBroken(false); } }
+    catch (e) { Alert.alert("Couldn't add that picture", String(e.message || e)); }
+  };
+  const heroUri = !imgBroken && item.image ? imageUri(item.image) : null;
+  const heroH = item.image && item.image.w && item.image.h ? Math.min(260, Math.max(150, (item.image.h / item.image.w) * 340)) : 200;
+
   const handleSaveEdit = () => {
     if (!value || value <= 0 || !categoryId) return;
-    onSave(item.id, { amount: Math.round(value * 100) / 100, note: note.trim(), category: categoryId, date, ...(accounts.length > 1 && accountId ? { account: accountId } : {}) });
+    onSave(item.id, { amount: Math.round(value * 100) / 100, note: note.trim(), category: categoryId, date, ...(accounts.length > 1 && accountId ? { account: accountId } : {}), image: image || undefined, imageLook: image ? imageLook : undefined });
     setEditing(false);
     onClose();
   };
@@ -61,6 +78,13 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
           <View style={styles.grabber} />
           {!editing ? (
             <>
+              {heroUri && (
+                <TouchableOpacity activeOpacity={0.9} onPress={() => setViewer(true)} style={[styles.hero, { height: heroH }]}>
+                  <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} onError={() => setImgBroken(true)} />
+                  <LinearGradient colors={[t.surface + '00', t.surface + '00', t.surface + 'F2']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
+                  <View style={styles.heroBadge}><Ionicons name="expand-outline" size={14} color="#FFFFFF" /></View>
+                </TouchableOpacity>
+              )}
               <View style={styles.headRow}>
                 <View style={[styles.iconCircle, { backgroundColor: cat.color + '33', borderColor: cat.color }]}><Text style={{ fontSize: 22 }}>{cat.icon}</Text></View>
                 <View style={{ flex: 1 }}>
@@ -117,6 +141,28 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
                   ))}
                 </View>
               )}
+              <View style={styles.picEdit}>
+                {image && !imgBroken ? (
+                  <Image source={{ uri: imageUri(image) }} style={styles.picThumb} contentFit="cover" />
+                ) : (
+                  <View style={[styles.picThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: t.surface2 }]}><Ionicons name="image-outline" size={20} color={t.inkFaint} /></View>
+                )}
+                <View style={{ flex: 1, gap: 6 }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity onPress={changePicture} style={styles.picAction}><Text style={styles.picActionText}>{image ? 'Change picture' : 'Add a picture or GIF'}</Text></TouchableOpacity>
+                    {image && <TouchableOpacity onPress={() => setImage(null)} style={styles.picAction}><Text style={[styles.picActionText, { color: t.spend }]}>Remove</Text></TouchableOpacity>}
+                  </View>
+                  {image && (
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {IMAGE_LOOKS.map((l) => (
+                        <TouchableOpacity key={l.key} onPress={() => setImageLook(l.key)} style={[styles.lookChip, imageLook === l.key && { backgroundColor: t.accent }]}>
+                          <Text style={{ color: imageLook === l.key ? t.onAccent : t.ink, fontSize: 12 }}>{l.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </View>
               <TextInput style={styles.textField} placeholder="Description" placeholderTextColor={t.inkFaint} value={note} onChangeText={setNote} maxLength={80} />
               <TouchableOpacity style={styles.dateBtn} onPress={() => setPickerOpen(true)}>
                 <Ionicons name="calendar-outline" size={17} color={t.ink} />
@@ -135,6 +181,12 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
           )}
         </View>
       </View>
+      <Modal visible={viewer} animationType="fade" transparent onRequestClose={() => setViewer(false)}>
+        <TouchableOpacity activeOpacity={1} style={styles.viewer} onPress={() => setViewer(false)}>
+          {heroUri && <Image source={{ uri: heroUri }} style={{ width: '100%', height: '80%' }} contentFit="contain" />}
+          <Text style={styles.viewerHint}>Tap to close</Text>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 }
@@ -142,6 +194,15 @@ export default function TransactionDetailModal({ visible, item, categories, onCl
 const makeStyles = (t) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: t.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 22, paddingTop: 8, paddingBottom: 26, maxHeight: '90%' },
+  hero: { marginHorizontal: -22, marginTop: -8, marginBottom: 12, overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  heroBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12, padding: 6 },
+  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', alignItems: 'center', justifyContent: 'center' },
+  viewerHint: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 16 },
+  picEdit: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  picThumb: { width: 64, height: 64, borderRadius: 14 },
+  picAction: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 12, backgroundColor: t.surface2 },
+  picActionText: { color: t.accent, fontSize: 12.5, fontWeight: '600' },
+  lookChip: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 12, backgroundColor: t.surface2 },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: t.edge, marginBottom: 16 },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   iconCircle: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },

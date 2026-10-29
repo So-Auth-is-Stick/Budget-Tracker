@@ -34,7 +34,7 @@ npx expo start -c
 
 * The first adds the notification / fingerprint / splash settings and the new icon to your `app.json`. It prints your
   `android.package`. That must be the same as before, so the APK installs as an update.
-* The second downloads the new libraries (icons, vibration, notifications, fingerprint, backup).
+* The second downloads the new libraries (icons, vibration, notifications, fingerprint, backup, pictures).
 * The third lets you try it in Expo Go first.
 
 ## 4. Build the APK
@@ -59,7 +59,7 @@ From then on your data is safe even if the phone is lost.
 
 **Seeing your money**
 * Calendar is now a heat map: every day shows what you spent, darker = heavier. Swipe between months; totals follow the month you're looking at. Add an entry to any past day from its day sheet.
-* **Insights** (Budget → Insights): earned/spent/kept, plain-English observations, day-by-day chart with month-end projection, where it went vs last month, your heaviest weekday, biggest expenses, money in, and **badges**.
+* **Insights** (the Insights card on Balance): earned/spent/kept, plain-English observations, day-by-day chart with month-end projection, where it went vs last month, your heaviest weekday, biggest expenses, money in, and **badges**.
 * A month recap card on Balance for the first week of each month.
 * Budget: "₱X left, about ₱Y a day" for the rest of the month, and *Use as limits* suggestions from what you usually spend.
 
@@ -78,6 +78,20 @@ From then on your data is safe even if the phone is lost.
 * Saving is now strictly one-at-a-time behind the scenes, so two quick saves can never overwrite each other, and a double-tap on Save no longer logs twice.
 * You'll be asked for notification permission once, the first time you have a plan with a due date or a recurring entry.
 * The app now shows version **2.0.0** in Android settings. A refreshed README with screenshots is included for GitHub.
+
+**New in round 5 (your requests)**
+* No more greetings: the Balance and PIN screens go straight to business.
+* The week bar chart on Balance is gone. In its place is an **Insights** card with one live observation and your streak; tap it for the full Insights.
+* **18 themes** (was 6), grouped Dark / Light: new Forest, Mocha, Graphite, Nord, Neon, Cyber, Matcha, Lavender, Sky, Peach, Mono, Sand. Plus an **accent colour** you can lay over any theme (Settings → Appearance).
+* An **80-colour palette** (20 hues × 4 shades) for tags, plans and accounts.
+* **Pictures and GIFs on entries**: in the + sheet, tap *Add a picture or GIF* and pick a look:
+  * **Fade**: the picture fills the right side and melts into the card
+  * **Glass**: a frosted, blurred version behind everything
+  * **Clear**: the full picture with a soft shade so text stays readable
+
+  A live preview shows exactly how it will look. Tapping an entry shows the picture big at the top (tap it for full screen); *Edit* lets you change or remove it. Works in the calendar day view too.
+  The picture is **copied into Ledger's private storage**: deleting the original from your phone doesn't affect it, and it never appears in your gallery. GIFs stay animated.
+  Note: backup files contain your entries but not the pictures themselves, so restoring on a *new* phone brings the entries back without their pictures.
 
 **Safety**
 * **Backup / restore** to a file (Drive, Gmail…), with undo for a restore, plus a reminder if you've never backed up. **Export to spreadsheet (.csv)**.

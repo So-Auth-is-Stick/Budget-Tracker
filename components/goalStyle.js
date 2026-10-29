@@ -1,6 +1,7 @@
 // Look of a plan (icon + colour). Older plans without these fall back to 🎯 and the theme accent.
 export const GOAL_ICONS = ['🎯', '🏠', '📱', '💻', '✈️', '🚗', '🎓', '💍', '🏥', '🎁', '🛡️', '🐷', '🏖️', '🎸', '👶', '🧾'];
-export const GOAL_COLORS = ['#E8B84B', '#FF7043', '#EC407A', '#AB47BC', '#5C6BC0', '#42A5F5', '#26A69A', '#66BB6A', '#C0CA33', '#8D6E63'];
+import { QUICK_COLORS } from './palette';
+export const GOAL_COLORS = ['#E8B84B', ...QUICK_COLORS];
 
 export const goalIcon = (g) => (g && g.icon) || '🎯';
 export const goalColor = (g, t) => (g && g.color) || t.accent;

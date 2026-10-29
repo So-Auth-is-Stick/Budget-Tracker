@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, ScrollView, StyleSheet, Switch, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ChangePinModal from './ChangePinModal';
+import ColorPicker from './ColorPicker';
 import { AccountsManager } from './AccountsUI';
 import { useAccounts } from './accounts';
 import { useTheme, THEMES, THEME_ORDER } from './theme';
@@ -22,7 +23,7 @@ function daysAgo(iso) {
 }
 
 export default function SettingsModal({ visible, onClose, onDataRestored, transactions = [], categories = [], setTransactions }) {
-  const { theme: t, themeKey, setThemeKey } = useTheme();
+  const { theme: t, themeKey, setThemeKey, accent, setAccent } = useTheme();
   const { prefs, setPref } = usePrefs();
   const toast = useToast();
   const styles = useMemo(() => makeStyles(t), [t]);
@@ -39,10 +40,12 @@ export default function SettingsModal({ visible, onClose, onDataRestored, transa
     hasUndoRestore().then(setCanUndo);
   }, [visible]);
 
-  const options = [
-    { key: 'system', name: 'Auto', preview: null },
-    ...THEME_ORDER.map((k) => ({ key: k, name: THEMES[k].name, preview: THEMES[k] })),
+  const opt = (k) => ({ key: k, name: THEMES[k].name, preview: THEMES[k] });
+  const themeGroups = [
+    ['Dark', [{ key: 'system', name: 'Auto', preview: null }, ...THEME_ORDER.filter((k) => THEMES[k].isDark).map(opt)]],
+    ['Light', THEME_ORDER.filter((k) => !THEMES[k].isDark).map(opt)],
   ];
+  const ACCENTS = ['#E8B84B', '#FF7043', '#EC407A', '#B794F6', '#4FC3F7', '#26A69A', '#9BE15D', '#F2F3F5'];
 
   const toggleBiometric = async (value) => {
     if (!value) { setPref('biometric', false); return; }
@@ -141,25 +144,43 @@ export default function SettingsModal({ visible, onClose, onDataRestored, transa
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
             <Text style={styles.sectionLabel}>Appearance</Text>
-            <View style={styles.grid}>
-              {options.map((o) => (
-                <TouchableOpacity key={o.key} onPress={() => { haptic.tap(); setThemeKey(o.key); }}
-                  style={[styles.themeCard, themeKey === o.key && styles.themeCardActive]}>
-                  {o.preview ? (
-                    <View style={[styles.swatch, { backgroundColor: o.preview.bg, borderColor: o.preview.edge }]}>
-                      <View style={[styles.swatchBar, { backgroundColor: o.preview.surface2 }]} />
-                      <View style={[styles.swatchDot, { backgroundColor: o.preview.accent }]} />
-                    </View>
-                  ) : (
-                    <View style={[styles.swatch, { alignItems: 'center', justifyContent: 'center', borderColor: t.edge }]}>
-                      <Ionicons name="contrast-outline" size={22} color={t.ink} />
-                    </View>
-                  )}
-                  <Text style={styles.themeName}>{o.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {themeGroups.map(([groupName, opts]) => (
+              <View key={groupName}>
+                <Text style={styles.groupLabel}>{groupName}</Text>
+                <View style={styles.grid}>
+                  {opts.map((o) => (
+                    <TouchableOpacity key={o.key} onPress={() => { haptic.tap(); setThemeKey(o.key); }}
+                      style={[styles.themeCard, themeKey === o.key && styles.themeCardActive]}>
+                      {o.preview ? (
+                        <View style={[styles.swatch, { backgroundColor: o.preview.bg, borderColor: o.preview.edge }]}>
+                          <View style={[styles.swatchBar, { backgroundColor: o.preview.surface2 }]} />
+                          <View style={[styles.swatchDot, { backgroundColor: o.preview.accent }]} />
+                        </View>
+                      ) : (
+                        <View style={[styles.swatch, { alignItems: 'center', justifyContent: 'center', borderColor: t.edge }]}>
+                          <Ionicons name="contrast-outline" size={22} color={t.ink} />
+                        </View>
+                      )}
+                      <Text style={styles.themeName}>{o.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ))}
             <Text style={styles.hint}>Auto follows your phone's light/dark setting.</Text>
+
+            <Text style={styles.groupLabel}>Accent colour</Text>
+            <View style={styles.accentRow}>
+              <TouchableOpacity onPress={() => { haptic.tap(); setAccent(null); }} style={[styles.accentChip, !accent && styles.accentChipOn]}>
+                <Text style={{ color: t.ink, fontSize: 12 }}>Theme's own</Text>
+              </TouchableOpacity>
+              {ACCENTS.map((c) => (
+                <TouchableOpacity key={c} onPress={() => { haptic.tap(); setAccent(c); }} accessibilityLabel={`accent ${c}`}
+                  style={[styles.accentDot, { backgroundColor: c }, accent === c && { borderWidth: 3, borderColor: t.ink }]} />
+              ))}
+              <ColorPicker trigger="more" size={30} value={accent} active={!!accent && !ACCENTS.includes(accent)} onChange={(c) => setAccent(c)} title="Accent colour" />
+            </View>
+            <Text style={styles.hint}>Recolours buttons, highlights and the + button in any theme.</Text>
 
             <Text style={styles.sectionLabel}>Money</Text>
             <View style={styles.group}>
@@ -245,6 +266,11 @@ const makeStyles = (t) => StyleSheet.create({
   done: { color: t.accent, fontSize: 15, fontWeight: '600' },
   sectionLabel: { color: t.inkDim, fontSize: 12, marginTop: 22, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  groupLabel: { color: t.inkFaint, fontSize: 12, marginTop: 12, marginBottom: 8 },
+  accentRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  accentChip: { paddingVertical: 7, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1.5, borderColor: t.edge },
+  accentChipOn: { borderColor: t.accent, backgroundColor: t.surface2 },
+  accentDot: { width: 30, height: 30, borderRadius: 15 },
   themeCard: { width: '22.5%', alignItems: 'center', paddingVertical: 8, borderRadius: 14, borderWidth: 2, borderColor: 'transparent' },
   themeCardActive: { borderColor: t.accent, backgroundColor: t.surface2 },
   swatch: { width: 48, height: 48, borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 6 },

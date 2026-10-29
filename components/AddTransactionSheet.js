@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Modal, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Modal, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DatePickerModal from './DatePickerModal';
 import { todayStr, formatLong } from './dateUtils';
@@ -10,6 +10,9 @@ import * as haptic from './haptics';
 import { frequentEntries } from './insights';
 import { useAccounts, defaultAccountId } from './accounts';
 import { usePrefs } from './prefs';
+
+import TransactionRow from './TransactionRow';
+import { pickEntryImage, IMAGE_LOOKS } from './imageStore';
 
 const shiftDay = (ds, n) => {
   const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
@@ -27,6 +30,9 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
   const [pickerVisible, setPickerVisible] = useState(false);
   const [noteFocused, setNoteFocused] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [image, setImage] = useState(null);       // { file, w, h, gif }
+  const [imageLook, setImageLook] = useState('fade');
+  const [picking, setPicking] = useState(false);
   const { accounts } = useAccounts();
   const { prefs, setPref } = usePrefs();
   const [accountId, setAccountId] = useState(null);
@@ -35,6 +41,7 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
     if (visible) {
       setAccountId(accounts.some((a) => a.id === prefs.lastAccount) ? prefs.lastAccount : defaultAccountId(accounts) || null);
       setSaving(false);
+      setImage(null); setImageLook('fade');
       setType('expense'); setCategoryId(null); setAmount(''); setNote(''); setDate(initialDate && initialDate <= todayStr() ? initialDate : todayStr());
     }
   }, [visible]);
@@ -91,13 +98,24 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
     return null;
   }, [type, categoryId, categories, transactions, date, value]);
 
+  const choosePicture = async () => {
+    if (picking) return;
+    setPicking(true);
+    try {
+      const img = await pickEntryImage();
+      if (img) { setImage(img); haptic.success(); }
+    } catch (e) {
+      Alert.alert("Couldn't add that picture", String(e.message || e));
+    } finally { setPicking(false); }
+  };
+
   const save = async () => {
     if (!valid) { haptic.warning(); return; }
     if (saving) return; // ignore a double tap
     setSaving(true);
     const acc = accounts.length > 1 && accountId ? { account: accountId } : {};
     if (acc.account) setPref('lastAccount', acc.account);
-    await onSave({ id: Date.now(), type, amount: Math.round(value * 100) / 100, category: categoryId, note: note.trim(), date, ...acc });
+    await onSave({ id: Date.now(), type, amount: Math.round(value * 100) / 100, category: categoryId, note: note.trim(), date, ...acc, ...(image ? { image, imageLook } : {}) });
     onClose();
   };
 
@@ -173,6 +191,34 @@ export default function AddTransactionSheet({ visible, onClose, categories, tran
               </View>
             )}
 
+            {!image ? (
+              <TouchableOpacity style={styles.picBtn} onPress={choosePicture} activeOpacity={0.7}>
+                <Ionicons name="image-outline" size={18} color={t.accent} />
+                <Text style={styles.picBtnText}>{picking ? 'Opening…' : 'Add a picture or GIF'}</Text>
+                <Text style={styles.picBtnHint}>optional</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.picBox}>
+                <Text style={styles.label}>Preview</Text>
+                <View style={{ marginHorizontal: -12 }}>
+                  <TransactionRow
+                    item={{ id: 'preview', type, amount: value > 0 ? value : 0, category: categoryId || (tagOrder[0] || {}).id, note: note.trim(), date, image, imageLook }}
+                    categories={categories} onPress={() => {}} />
+                </View>
+                <View style={styles.lookRow}>
+                  {IMAGE_LOOKS.map((l) => (
+                    <TouchableOpacity key={l.key} onPress={() => { haptic.tap(); setImageLook(l.key); }} style={[styles.lookChip, imageLook === l.key && styles.lookChipOn]}>
+                      <Text style={{ color: imageLook === l.key ? t.onAccent : t.ink, fontSize: 12.5, fontWeight: '600' }}>{l.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity onPress={choosePicture} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}><Ionicons name="swap-horizontal" size={20} color={t.inkDim} /></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setImage(null)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}><Ionicons name="trash-outline" size={19} color={t.spend} /></TouchableOpacity>
+                </View>
+                <Text style={styles.picBtnHint}>{IMAGE_LOOKS.find((l) => l.key === imageLook).hint}</Text>
+              </View>
+            )}
+
             {accounts.length > 1 && (
               <View style={styles.accRow}>
                 {accounts.map((a) => (
@@ -234,6 +280,13 @@ const makeStyles = (t) => StyleSheet.create({
   suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   suggest: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 12, backgroundColor: t.accent + '1F', maxWidth: 160 },
   suggestText: { color: t.ink, fontSize: 12.5 },
+  picBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: t.accent + '99', borderRadius: 14, paddingVertical: 11, paddingHorizontal: 14, marginBottom: 10 },
+  picBtnText: { color: t.accent, fontWeight: '700', fontSize: 13.5, flex: 1 },
+  picBtnHint: { color: t.inkFaint, fontSize: 11.5 },
+  picBox: { marginBottom: 10 },
+  lookRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 4 },
+  lookChip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, backgroundColor: t.surface2 },
+  lookChipOn: { backgroundColor: t.accent },
   accRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2, marginBottom: 6 },
   accChip: { paddingVertical: 6, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: t.edge },
   dateRow: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 18 },
